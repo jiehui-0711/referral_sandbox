@@ -1,0 +1,19 @@
+[project]
+name = "referral-sandbox"
+version = "0.1.0.dev0"
+description = "Referral sandbox (spec v1.0): multi-agent, event-driven referral benchmark"
+requires-python = ">=3.10"
+dependencies = ["pyyaml>=6"]
+
+[project.scripts]
+rsandbox = "rsandbox.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+rsandbox = ["data/**/*.yaml", "data/**/*.txt"]

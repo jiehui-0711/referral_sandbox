@@ -1,0 +1,79 @@
+# v4_slot_cancelled 的腳本：額外的檢查素材，不是任務定義的一部分。
+#   - 腳本是這一題的一個標準答案：照它走得完，代表這個任務設計得
+#     出來、走得到終點。但 Agent 不必照它走
+#   - 它跟任務檔分開：任務檔是世界發生了什麼，腳本是可以怎麼走。
+#     一個任務沒有腳本也是合法的任務
+variant: v4_slot_cancelled
+
+reference:
+  - {tool: query_slots, args: {institution_id: H1, dept: GI, service: COL,
+                               date_from: "2026-09-05", date_to: "2026-09-30"}}
+  # 09-10 已經不在回傳清單裡了（query_slots 只列 status == open）
+  - tool: record_assessment
+    args:
+      key: replacement_date
+      value: "2026-09-15（09-06／09-08 太趕，新的末次服藥日會落在過去或今天）"
+      evidence: ["clock=2026-09-04", "HOLD-01.hold_days=5"]
+      rule_id: HOLD-01
+  - {tool: reschedule_appointment, args: {appointment_id: "{{APT}}", new_slot_id: H1-GI-COL-20260915-AM}}      # 09-15
+  - {tool: search_guidelines, args:
+       {query: "withholding warfarin before a high bleeding risk endoscopic procedure non-valvular atrial fibrillation"}}
+  # 09-15 − 5 = 09-10
+  - {tool: issue_hold_order, args: {drug: Warfarin, hold_days: 5,
+                                    last_dose_date: "2026-09-10",
+                                    substitute: none, supersedes: "{{HO}}"}}
+  - {tool: search_guidelines, args:
+       {query: "pre-procedure blood test when an anticoagulant has been withheld"}}
+  - {tool: order_preop_lab, args: {site: C0, test: INR, draw_date: "2026-09-14", supersedes: "{{LAB}}"}}
+  # 09-04 送達，比舊的末次服藥日 09-05 早一天。病人還沒開始停藥，來得及。
+  - {tool: send_prep_instructions, args: {}}
+  - {tool: end_turn, args: {note: "Rebooked after the cancellation; patient informed."}}
+
+alternatives:
+  # 修正了，但太晚。
+  #   - Agent 發現了、重查了、算對了、重寄了，四段推理一步都沒錯，
+  #     但它拖到 09-06 才把新單子寄出去，而病人已經照舊單在 09-05
+  #     停藥了
+  #   - 這條軌跡橫跨三個回合（09-04 做事、09-05 空著、09-06 才寄），
+  #     所以它同時也在測主迴圈：迴圈一看到空回合就結束的話，這條根本
+  #     跑不出來
+  - id: alt_late
+    description: 每一步都做對，但拖到 09-06 才把新說明單寄出去
+    steps:
+      #  第一回合：09-04
+        - {tool: query_slots, args: {institution_id: H1, dept: GI, service: COL,
+                                   date_from: "2026-09-05", date_to: "2026-09-30"}}
+        - {tool: reschedule_appointment, args: {appointment_id: "{{APT}}", new_slot_id: H1-GI-COL-20260915-AM}}
+        - {tool: search_guidelines, args:
+             {query: "withholding warfarin before a high bleeding risk endoscopic procedure non-valvular atrial fibrillation"}}
+        - {tool: issue_hold_order, args: {drug: Warfarin, hold_days: 5,
+                                        last_dose_date: "2026-09-10",
+                                        substitute: none, supersedes: "{{HO}}"}}
+        - {tool: search_guidelines, args:
+             {query: "pre-procedure blood test when an anticoagulant has been withheld"}}
+        - {tool: order_preop_lab, args: {site: C0, test: INR, draw_date: "2026-09-14", supersedes: "{{LAB}}"}}
+        - {tool: end_turn, args: {note: "Rebooked; will send instructions shortly."}}
+      #  第二回合：09-05　什麼都沒做（就是這一天把病人推到暴露日）
+        - {tool: end_turn, args: {note: "Nothing further today."}}
+      #  第三回合：09-06　才想起來要寄
+        - {tool: send_prep_instructions, args: {}}
+        - {tool: end_turn, args: {note: "Updated instructions sent."}}
+
+  # 對系統事件只做最小反應：改了期就算了。跟 v1 的
+  # alt_reschedule_only 同一種錯，但發起者是系統不是人。
+  - id: alt_minimal_response
+    description: 只改期，因為「系統通知」沒有人在跟它說話
+    steps:
+        - {tool: query_slots, args: {institution_id: H1, dept: GI, service: COL,
+                                   date_from: "2026-09-05", date_to: "2026-09-30"}}
+        - {tool: reschedule_appointment, args: {appointment_id: "{{APT}}", new_slot_id: H1-GI-COL-20260915-AM}}
+        - {tool: end_turn, args: {note: "Rebooked."}}
+
+  # 什麼都不做。這一條是永久守門，不是為了模擬某個真實失敗。
+  # 什麼都不改的時候，一致是自動成立的：預約還是 09-10、醫囑還是
+  # 09-05、快照還是 {09-10, 09-05}，彼此對得起來，但該做的事一件
+  # 都沒做。
+  - id: alt_did_nothing
+    description: 收到事件但什麼都沒做
+    steps:
+        - {tool: end_turn, args: {note: "Noted."}}

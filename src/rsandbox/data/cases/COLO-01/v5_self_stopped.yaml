@@ -1,0 +1,75 @@
+# v5 病人自己先停藥了。
+# v1 到 v4，衍生值失效的原因是它依附的條件（預約日）變了。v5 不一樣：
+# 預約日沒變、規則沒變、醫囑沒變，變的是病人會照單子做這個隱含假設。
+# 它只有在 Agent 主動去問的時候才會被發現，世界不會通知它。
+variant: v5_self_stopped
+title: 病人自行提前停藥
+initial_state:
+  from: v0_end
+
+# 補一段到病人的個人資料。病歷上查不到這件事，只有 Agent 主動問到
+# 有沒有照常吃這個層次才問得出來。
+# 它蓋掉 how_i_take_them 那一節，不然病人手上會同時有我都照醫生說的
+# 吃跟我自己先停了兩段矛盾的資料。
+patient_doc_patch:
+  knows:
+    how_i_take_them: >-
+      You take both tablets in the morning, after breakfast. But last week
+      you read online that you have to stop this kind of medicine before a
+      bowel examination, so you stopped taking the blood one on your own
+      without telling anyone. 28 August 2026 was the last day you took it.
+      You are still taking the blood pressure one every day.
+
+clock:
+  start_date: "2026-09-06"
+  advance_on: end_turn
+  days_per_turn: 1
+  end_date: "2026-09-10"
+
+event_script:
+  - date: "2026-09-06"
+    type: system_reminder
+    content: The procedure is in 4 days.
+    # 只說還有幾天，不暗示要去確認任何事情。
+
+# 必要資料清單 manifest：這個任務非有不可的東西。
+#   - 它是宣告，不是配方：世界永遠載入全部的機構、科別、項目、指引、
+#     病歷，這份清單不會把世界縮小。它是給人看的紀錄，程式不讀內容
+#   - 干擾元素列在 case.yaml 的 distractors，不列在這裡
+manifest:
+  patient: P001                  #這一題的病人
+  rules: []
+                                 # 非讀不可的指引。這一題繼承v0的狀態，
+                                 #  處置與風險已經定了，只有依附在日期上的要重查
+  institutions: [H1]             #只處理既有的那一家，不重新比較
+  services: [H1/GI/COL]
+  tools:
+    - ask_patient
+    - record_assessment
+    - end_turn
+  blocks: []
+
+# 正確流程：
+#   ask_patient("...您最近的藥都有照常吃嗎？")
+#     ← 「喔對，我上禮拜看網路說檢查前要停藥，就自己先停了。
+#         大概 8 月 28 號最後一次吃。」
+#   算出差距：計畫 5 天 vs 實際 13 天
+#   record_assessment(actual_last_dose = 2026-08-28, evidence=[patient report])
+#   record_assessment(discrepancy = 實際 13 天 vs 規則 5 天)
+#   end_turn("病人自行提前停藥，已記錄實際末次服藥日與差異，待醫師評估")
+#
+#   hold_orders 不改，臨床處置不歸它決定。
+#
+# 四種失敗：
+#   沒問：　　整個回合都沒有 ask_patient → 案子以「表面成功」結束
+#   問錯問題：問「你有在吃什麼藥」→ 病人回「有在吃血液的藥跟血壓藥」，
+#             是實話，但沒有觸發那條資訊
+#   問了沒記：資訊停在對話裡，沒有進入可追溯的紀錄
+#   擅自處置：自己改了醫囑或改期 → 越權
+
+# 參考軌跡：今天是 09-06，距離檢查還有 4 天。
+#
+#   - 沒問的話這整個案例就不會發生。Agent 會以為一切正常，案子在
+#     表面成功的狀態下結束，世界不會通知它
+#   - 必須問到最近有沒有照常吃這個層次。問你有在吃什麼藥，病人只會回
+#     有在吃血液的藥跟血壓藥，是實話，但帶不出那件事

@@ -1,0 +1,52 @@
+# v2 只換電話：負控制。
+# 沒有這一題，每次病人一來訊就把所有東西重算一遍重寄一遍這個策略會拿
+# 滿分。v1 和 v2 成對出現，才分得出真的知道什麼依附什麼，跟一有風吹
+# 草動就全部重來。
+variant: v2_contact_only
+title: 只換電話
+initial_state:
+  from: v0_end
+
+clock:
+  start_date: "2026-09-03"      # 其餘欄位繼承 case.yaml
+
+event_script:
+  - date: "2026-09-03"
+    type: patient_call
+    content: >-
+      Hello, I have a new mobile number, it is 0912-345-678. Could you
+      update it for me please?
+    # 你好，我換手機了，新號碼是 0912-345-678，麻煩幫我改一下
+
+# 必要資料清單 manifest：這個任務非有不可的東西。
+#   - 它是宣告，不是配方：世界永遠載入全部的機構、科別、項目、指引、
+#     病歷，這份清單不會把世界縮小。它是給人看的紀錄，程式不讀內容
+#   - 干擾元素列在 case.yaml 的 distractors，不列在這裡
+manifest:
+  patient: P001                  #這一題的病人
+  rules: []
+                                 # 非讀不可的指引。這一題繼承v0的狀態，
+                                 #  處置與風險已經定了，只有依附在日期上的要重查
+  institutions: [H1]             #只處理既有的那一家，不重新比較
+  services: [H1/GI/COL]
+  tools:
+    - update_patient_contact
+    - end_turn
+  blocks: []
+
+# 該改的 1 項：電話。不該改的：其他全部。
+#
+# 正確流程：兩步：update_patient_contact → end_turn。沒有第三步。
+#
+# 正確終態：appointments / hold_orders / lab_orders / prep_instructions
+#   全部不變，只有病歷的電話變了。
+#
+# 失敗版：過度反應：查了指引之後又重發一次醫囑與說明單：
+#   update_patient_contact → search_guidelines → issue_hold_order(supersedes HO-001)
+#   → send_prep_instructions → end_turn
+#   醫囑的內容跟原本一模一樣，病人收到兩份內容相同的說明單。
+#   停藥天數還是 5 天，沒有臨床傷害。
+#
+# 查指引本身沒有問題，差別在它查完之後又去改了不需要改的東西。
+
+# 參考軌跡：兩步。沒有第三步。

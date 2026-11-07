@@ -1,0 +1,14 @@
+# 固定層：機構的地點。
+# 病人的住處與它到各機構的交通時間，在各情境自己的資料夾裡
+# （cases/<情境>/places.yaml）。這裡只有五個機構。
+#   - travel 是單程分鐘，雙向相同。跑一趟 = 來回 = minutes × 2，
+#     工具不替 Agent 乘二，也不加總
+#   - 查交通時間的規則是恰好一端是機構，所以這個檔案裡沒有機構到機構
+#     的資料。哪天需要（例如轉院），改 handlers/world.py 的那條規則
+#     並補資料
+places:
+  - {id: PL-C0, label: "Ren'ai Family Medicine Clinic"}      #仁愛診所
+  - {id: PL-H1, label: "Renkang Hospital"}                   #仁康醫院
+  - {id: PL-H2, label: "Beichen Medical Centre"}             #北辰醫學中心
+  - {id: PL-H3, label: "Songhe Regional Hospital"}           #松禾區域醫院
+  - {id: PL-H4, label: "Lanxi District Hospital"}            #蘭溪地區醫院

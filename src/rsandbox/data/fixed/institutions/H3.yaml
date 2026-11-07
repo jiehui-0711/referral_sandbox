@@ -1,0 +1,19 @@
+# H3 松禾區域醫院：最遠（單程 50 分），而且兩個任務都要先初診。
+#   - 隱含負擔藏在科別層：
+#         H3.GI.1        大腸鏡要先初診，而且檢查必須在初診 5 天後
+#         H3.ORTH.1      關節置換要先初診（麻醉評估順便在初診做掉）
+#         H3.ORTH.TKA.2  還要上一堂週六的衛教課
+#     每一條都多一趟，50 分 × 2 × 多出來的趟數，差距很快就拉開
+#   - 這些都不是寫在項目層，是寫在科別層。Agent 不往下查就只會看到
+#     週三上午有大腸鏡，不知道還要先初診
+institution_id: H3
+name: Songhe Regional Hospital           #松禾區域醫院（虛構）
+name_zh: 松禾區域醫院
+role: receiving
+kind: hospital
+place_id: PL-H3
+referable: true
+booking_requires_referral: true
+block_ids: [H3.1, H3.2, H3.3]
+report_turnaround_days: 5
+

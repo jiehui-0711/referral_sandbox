@@ -1,0 +1,49 @@
+# 元素 LAB：檢驗
+# 一個元素 = 一個臨床能力包，跨醫院。它宣告自己需要哪些科別與項目，
+# 以及那些科別／項目的規定與診次。
+#   - 科別可以被多個元素宣告（骨科同時被人工膝關節與骨折用到），
+#     載入器會合併，屬性不一致才報錯
+#   - 任務清單用 elements 選它當必要元素，用 distractors 選它當干擾
+#     元素。內容完全一樣，干擾不另外撰寫
+element_id: LAB
+title: 檢驗
+
+#  這個元素需要的科別與項目
+departments:
+  # 掛在 H1
+  - dept_id: H1_LAB
+    dept: LAB
+    name: Laboratory                     #檢驗科
+    status: empty
+    # 空白科：科存在、可以走進去，但沒有公布任何資訊。
+    # 保留給之後的干擾項。抽血不需要預約診次，靠抽血單指定日期。
+    services: []
+  # 掛在 H2
+  - dept_id: H2_LAB
+    dept: LAB
+    name: Laboratory                     #檢驗科
+    status: published
+    block_ids: [H2.LAB.1]
+    services: []
+    # 有公布資訊（開放時間），但抽血不需要預約診次。
+    # 跟 H2.3（術前抽血須在本院）是一組的。
+
+  # 掛在 H3
+  - dept_id: H3_LAB
+    dept: LAB
+    name: Laboratory                     #檢驗科
+    status: empty
+    services: []
+  # 掛在 H4
+  - dept_id: H4_LAB
+    dept: LAB
+    name: Laboratory                     #檢驗科
+    status: empty
+    services: []
+
+#  科別層與項目層的資訊段落
+blocks:
+
+- {id: H2.LAB.1, scope: department, owner: H2/LAB, role: task, reveal: always,
+   text: "Laboratory opening hours: weekdays 07:30-16:00."}
+  # 跟 H2.3（術前抽血須在本院）是一組的

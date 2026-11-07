@@ -1,0 +1,25 @@
+# 機構層這一層的工具：查一間醫院公布的規定與它有哪些科。
+# 資料夾名字是資訊層級（機構／科別／項目），不是位置權限：
+# 所有工具都可以從任何節點呼叫，詳見 loaders/graph.py 的 LEVEL_DIRS。
+tools:
+
+  - tool_id: get_institution_info                 #查這一間醫院的機構層資訊
+    label: get_institution_info
+    kind: read
+    description: "Return the published information for this institution and the list of its departments."
+                                                  # 回傳本機構公布的資訊，以及科別清單
+    tags: [hospital, information, fees, laboratory, departments, about]
+    permissions: [referral_agent]
+    params:
+      institution_id: {type: string, required: true, enum_from: world.institutions}
+                                                  # 機構代號，必填
+    returns: {institution_id: string, name: string, kind: string,
+              information: list, departments: list}
+    precondition:
+      - {type: admin, rule: "args.institution_id in institutions", on_fail: unknown_institution}
+    side_effects: []
+    handler: runtime.handlers.world.get_institution_info
+    version: v1
+    # 機構層藏的是費用與抽血地點。H2.3（術前抽血須在本院，不收外院
+    # 報告）就在這裡，它決定了抽血那一趟要跑多遠。
+

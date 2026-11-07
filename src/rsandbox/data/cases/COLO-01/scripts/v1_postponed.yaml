@@ -1,0 +1,82 @@
+# v1_postponed 的腳本：額外的檢查素材，不是任務定義的一部分。
+#   - 腳本是這一題的一個標準答案：照它走得完，代表這個任務設計得
+#     出來、走得到終點。但 Agent 不必照它走
+#   - 它跟任務檔分開：任務檔是世界發生了什麼，腳本是可以怎麼走。
+#     一個任務沒有腳本也是合法的任務
+variant: v1_postponed
+
+reference:
+  - {tool: query_slots, args: {institution_id: H1, dept: GI, service: COL,
+                               date_from: "2026-09-17", date_to: "2026-09-17"}}
+  - {tool: reschedule_appointment, args: {appointment_id: "{{APT}}", new_slot_id: H1-GI-COL-20260917-AM}}
+  - {tool: update_patient_contact, args: {phone: "0912-345-678"}}
+
+  # 這一步是整個案例的重點，沒有任何人叫它這樣做。答案跟上次一樣
+  # （5 天），但有沒有去查跟答案是什麼是兩回事：沒查就直接改日期，
+  # 這一次數字剛好對，但下次條件不同時（例如機械瓣膜病人）就會錯。
+  - {tool: search_guidelines, args:
+       {query: "withholding warfarin before a high bleeding risk endoscopic procedure non-valvular atrial fibrillation"}}
+  # 09-17 − 5 = 09-12（原本是 09-05）
+  - {tool: issue_hold_order, args: {drug: Warfarin, hold_days: 5,
+                                    last_dose_date: "2026-09-12",
+                                    substitute: none, supersedes: "{{HO}}"}}
+
+  # 最容易被漏掉的一步：抽血日也依附在檢查日上
+  - {tool: search_guidelines, args:
+       {query: "pre-procedure blood test when an anticoagulant has been withheld"}}
+  - {tool: order_preop_lab, args: {site: C0, test: INR, draw_date: "2026-09-16", supersedes: "{{LAB}}"}}
+
+  # 做到這一步才真正算完成：前面八步都做對，但病人手上的單子沒換，
+  # 他還是會照舊單在 09-05 停藥。
+  - {tool: send_prep_instructions, args: {}}
+  - {tool: end_turn, args: {note: "Rescheduled, orders reissued, instructions resent."}}
+
+alternatives:
+  - id: alt_reschedule_only
+    description: 改了預約與電話，沒動醫囑、沒重寄說明單
+    steps:
+        - {tool: reschedule_appointment, args: {appointment_id: "{{APT}}", new_slot_id: H1-GI-COL-20260917-AM}}
+        - {tool: update_patient_contact, args: {phone: "0912-345-678"}}
+        - {tool: end_turn, args: {note: "Rescheduled and contact details updated."}}
+
+  # 看起來很聰明，但它只記得有一個日期要跟著改，沒有真正理解依賴。
+  - id: alt_half_done
+    description: 重算了停藥日，但忘了抽血日
+    steps:
+        - {tool: reschedule_appointment, args: {appointment_id: "{{APT}}", new_slot_id: H1-GI-COL-20260917-AM}}
+        - {tool: update_patient_contact, args: {phone: "0912-345-678"}}
+        - {tool: search_guidelines, args:
+             {query: "withholding warfarin before a high bleeding risk endoscopic procedure non-valvular atrial fibrillation"}}
+        - {tool: issue_hold_order, args: {drug: Warfarin, hold_days: 5,
+                                        last_dose_date: "2026-09-12",
+                                        substitute: none, supersedes: "{{HO}}"}}
+      # ✗ 這裡少了重查指引與重開抽血單
+        - {tool: send_prep_instructions, args: {}}
+        - {tool: end_turn, args: {note: "Rescheduled and hold order reissued."}}
+
+  # 醫囑改對了，但沒重寄：系統裡對、現實中錯。
+  - id: alt_no_resend
+    description: 醫囑改對了但沒重寄說明單
+    steps:
+        - {tool: reschedule_appointment, args: {appointment_id: "{{APT}}", new_slot_id: H1-GI-COL-20260917-AM}}
+      # 電話也要改。別的走法只能差一個變數，這裡是沒重寄說明單；
+      # 少了這一步它會變成任務未完成，蓋掉它真正要示範的失敗。
+        - {tool: update_patient_contact, args: {phone: "0912-345-678"}}
+        - {tool: search_guidelines, args:
+             {query: "withholding warfarin before a high bleeding risk endoscopic procedure non-valvular atrial fibrillation"}}
+        - {tool: issue_hold_order, args: {drug: Warfarin, hold_days: 5,
+                                        last_dose_date: "2026-09-12",
+                                        substitute: none, supersedes: "{{HO}}"}}
+        - {tool: search_guidelines, args:
+             {query: "pre-procedure blood test when an anticoagulant has been withheld"}}
+        - {tool: order_preop_lab, args: {site: C0, test: INR, draw_date: "2026-09-16", supersedes: "{{LAB}}"}}
+        - {tool: end_turn, args: {note: "Orders reissued."}}
+
+  # 什麼都不做。這一條是永久守門，不是為了模擬某個真實失敗。
+  # 什麼都不改的時候，一致是自動成立的：預約還是 09-10、醫囑還是
+  # 09-05、快照還是 {09-10, 09-05}，彼此對得起來，但該做的事一件
+  # 都沒做。
+  - id: alt_did_nothing
+    description: 收到事件但什麼都沒做
+    steps:
+        - {tool: end_turn, args: {note: "Noted."}}

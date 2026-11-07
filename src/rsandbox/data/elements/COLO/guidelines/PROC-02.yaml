@@ -1,0 +1,27 @@
+# 指引 PROC-02：which_procedure
+# Agent 用 search_guidelines 檢索得到這一份。回傳的欄位只有五個：
+#     guideline_id / decision / title / when / action
+#   - 條件式，不是散文，不可能被讀錯，只可能被挑錯哪一份適用
+#   - 不回傳 以下的欄位絕對不會給 Agent
+#   - when.procedure_category 就是這份指引適用哪一種處置，不另開一個
+#     屬性，適用範圍本來就是條件的一部分
+guideline_id: PROC-02
+decision: which_procedure
+title: 'Which procedure after a positive bowel-screening test: alarm features present'
+when:
+  procedure_category: any
+  presentation: bowel_screening
+  screening_result: FIT_positive
+  alarm_features: present
+action:
+  procedure: colonoscopy_full
+  slot_type: endoscopy
+  urgency: urgent
+  deadline_days: 14
+
+#  不回傳給 Agent
+source: self_authored
+source_type: self_authored
+reviewed_by: null
+assumption: 本案例不會命中。這一條存在的理由不是臨床完整性，是實驗設計： 若表裡只有 PROC-01，Agent 把 alarm_features 歸納錯（填 present） 會得到「查無此規則」——那等於環境免費告訴它「你填錯了」。
+  有了這一條，同樣的錯誤會得到一個看似合理但錯誤的答案， Agent 會照樣往下走，那才是要測的失敗模式。

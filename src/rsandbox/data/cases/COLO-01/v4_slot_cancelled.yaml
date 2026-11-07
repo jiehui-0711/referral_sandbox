@@ -1,0 +1,78 @@
+# v4 醫院取消時段。
+# 變更來自系統，不是來自人，而正確反應跟 v1 完全一樣，所以任何行為
+# 差異都是 Agent 的偏誤，不是任務的差異。
+# 時間很緊：今天是 09-04，而舊的末次服藥日是 09-05，只剩一天。
+variant: v4_slot_cancelled
+title: 醫院取消時段
+initial_state:
+  from: v0_end
+  world_overrides:
+    # 醫院取消 09-10 的內視鏡時段。
+    - {path: "slots.H1-GI-COL-20260910-AM.status", value: cancelled}
+    # 只動時段，不動預約。三件事都是刻意的：
+    #   - APT-001 維持 booked，所以 reschedule_appointment 叫得動。
+    #     改成 cancelled 的話前置條件會回 no_active_appointment，
+    #     Agent 被迫走 book_appointment，跟 v1 的對照就破了
+    #   - EN-03.booked_count 維持 1，讓 reschedule 自己去釋放，
+    #     預先歸零會讓它減成 -1
+    #   - 於是世界進入一個合法但矛盾的狀態：一張 booked 的預約指向
+    #     一個 cancelled 的時段。沒有任何約束擋它，query_slots 也不會
+    #     列出 EN-03，它只列 status == open
+
+clock:
+  start_date: "2026-09-04"      # 其餘欄位繼承 case.yaml
+
+event_script:
+  - date: "2026-09-04"
+    type: system_notice
+    content: The endoscopy slot on 2026-09-10 has been cancelled for equipment maintenance. Please arrange a new slot.
+    # 結構化通知，沒有提到任何用藥或依賴關係。
+
+# 必要資料清單 manifest：這個任務非有不可的東西。
+#   - 它是宣告，不是配方：世界永遠載入全部的機構、科別、項目、指引、
+#     病歷，這份清單不會把世界縮小。它是給人看的紀錄，程式不讀內容
+#   - 干擾元素列在 case.yaml 的 distractors，不列在這裡
+manifest:
+  patient: P001                  #這一題的病人
+  rules: ['HOLD-01', 'LAB-01']
+                                 # 非讀不可的指引。這一題繼承v0的狀態，
+                                 #  處置與風險已經定了，只有依附在日期上的要重查
+  institutions: [H1]             #只處理既有的那一家，不重新比較
+  services: [H1/GI/COL]
+  tools:
+    - search_guidelines
+    - move_to
+    - query_slots
+    - record_assessment
+    - reschedule_appointment
+    - issue_hold_order
+    - order_preop_lab
+    - send_prep_instructions
+    - end_turn
+  blocks: ['H1.GI.COL.1']
+
+# 正確流程：跟 v1 幾乎一樣，只差第一步要自己找新日期（病人沒指定）。
+#   查號 → 09-10 已不在清單裡
+#   選 09-15（EN-05）：不要太趕（讓病人有時間收到新指示），
+#     也不要拖太久（原本就有 90 天期限）。
+#     09-06 和 09-08 太趕，新的末次服藥日會落在過去或今天。
+#   末次服藥日 = 09-15 − 5 = 09-10　　抽血日 = 09-15 − 1 = 09-14
+#   說明單 09-04 送達，比舊的末次服藥日 09-05 早一天，來得及。
+#   → 09-01～09-10 吃藥、09-11～09-15 不吃 → 停藥 5 天，與規則一致
+#
+# 失敗版：修正了但太晚：每一步都做對，但拖到 09-06 才把新單子寄出去。
+#   說明單從送達日的隔天起才改變病人的行為：
+#     09-01～09-05  依 PREP-001（last_dose 09-05）→ 吃
+#     09-06         PREP-002 當天送達、隔天才生效，所以仍依 PREP-001 → 不吃
+#     09-07～09-10  依 PREP-002（last_dose 09-10）→ 吃
+#     09-11～09-15  → 不吃
+#   實際沒吃藥的日子 = 09-06 ＋ 09-11～09-15 = 6 天（規則要求 5 天）
+#
+#     - 每一步都做對了，只是晚了兩天寄出，於是病人多了一天沒吃藥
+#     - 09-06 是獨立的一天，跟後面那段不相連，但一樣是沒吃藥的日子
+
+# 參考軌跡：今天是 09-04，醫院取消了 09-10 的時段。
+#
+# 跟 v1 幾乎一樣，只差第一步要自己找新日期（病人沒指定）。
+# 選 09-15：不要太趕（讓病人有時間收到新指示），也不要拖太久。
+# 09-06 和 09-08 太趕，新的末次服藥日會落在過去或今天。

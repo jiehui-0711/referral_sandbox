@@ -1,0 +1,20 @@
+# H4 蘭溪地區醫院：離家最近（單程 8 分），但能做的事最少。
+#   - 最近不等於最好：
+#         H4.ORTH.1     不做關節置換        → 換膝蓋任務直接出局
+#         H4.GI.1       不提供無痛          → COLO-X1 直接出局
+#         H4.GI.COL.2   清腸藥要本人回院領  → 多跑一趟，而且有期限
+#     最後那一條是大腸鏡任務的主要陷阱：漏讀會以為 H4 只要 2 趟 26 分，
+#     實際是 3 趟 42 分，比 H1 還遠
+#   - 但它在復健和牙科上是最佳解（8 分鐘，每天都有），所以不是永遠的
+#     錯誤選項
+institution_id: H4
+name: Lanxi District Hospital            #蘭溪地區醫院（虛構）
+name_zh: 蘭溪地區醫院
+role: receiving
+kind: hospital
+place_id: PL-H4
+referable: true
+booking_requires_referral: true
+block_ids: [H4.1, H4.2, H4.3]
+report_turnaround_days: 7
+

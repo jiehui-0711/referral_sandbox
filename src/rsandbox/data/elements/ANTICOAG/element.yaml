@@ -1,0 +1,67 @@
+# 元素 ANTICOAG：抗凝血照護門診
+# 一個元素 = 一個臨床能力包，跨醫院。它宣告自己需要哪些科別與項目，
+# 以及那些科別／項目的規定與診次。
+#   - 科別可以被多個元素宣告（骨科同時被人工膝關節與骨折用到），
+#     載入器會合併，屬性不一致才報錯
+#   - 任務清單用 elements 選它當必要元素，用 distractors 選它當干擾
+#     元素。內容完全一樣，干擾不另外撰寫
+element_id: ANTICOAG
+title: 抗凝血照護門診
+
+#  這個元素需要的科別與項目
+departments:
+  # 掛在 H1
+  - dept_id: H1_CARD
+    dept: CARD
+    name: Cardiology                     #心臟內科
+    status: published
+    block_ids: [H1.CARD.1]
+    services:
+      - {code: CCL,  name: Cardiology clinic,              slot_type: clinic}
+        # 干擾項。病人有心房顫動，所以它看起來很相關，但這次不需要
+
+  # 掛在 H2
+  - dept_id: H2_CARD
+    dept: CARD
+    name: Cardiology                     #心臟內科
+    status: published
+    block_ids: [H2.CARD.1]
+    services:
+      - {code: CCL,  name: Cardiology clinic,              slot_type: clinic}
+
+#  科別層與項目層的資訊段落
+blocks:
+
+- {id: H1.CARD.1, scope: department, owner: H1/CARD, role: distractor, reveal: always,
+   text: "Cardiology clinic, Tuesday and Thursday afternoons. Echocardiography by appointment."}
+  # 干擾項。病人有心房顫動，看起來很相關，但這次不需要
+- {id: H2.CARD.1, scope: department, owner: H2/CARD, role: distractor, reveal: always,
+   text: "Cardiology clinic, Monday to Friday mornings. Anticoagulation clinic on Wednesday afternoons."}
+  # 抗凝血門診。看起來超級相關，但停藥要查指引，不是轉去這一科
+
+#  診次規則
+slot_rules:
+
+#  其他干擾科
+
+- rule_id: R-H1-CARD-CCL
+  institution_id: H1
+  dept: CARD
+  service: CCL
+  weekdays: [Tue, Thu]
+  period: PM
+  capacity: 8
+  date_from: "2026-09-01"
+  date_to: "2027-02-28"
+  # 干擾項。病人有心房顫動，看起來很相關，但這次不需要
+
+- rule_id: R-H2-CARD-CCL
+  institution_id: H2
+  dept: CARD
+  service: CCL
+  weekdays: [Mon, Tue, Wed, Thu, Fri]
+  period: AM
+  capacity: 8
+  date_from: "2026-09-01"
+  date_to: "2027-02-28"
+

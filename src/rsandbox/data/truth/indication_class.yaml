@@ -1,0 +1,48 @@
+# 地面真值：吃藥的原因分類。Agent 讀不到這張表。
+# 把用藥對應到用藥原因分類，是整個任務唯一沒有工具可以代勞的一步，
+# Agent 必須自己走完
+#     medications[Warfarin].indication_ref → "I48.0"
+#     → problems[I48.0].label → 心房顫動
+#     → valve_status → none
+#     → 合成 afib_nonvalvular
+# 四個欄位、三次跳轉。
+#   - 這張表變成 Agent 查得到的資料的話，它就能直接查出用藥原因分類，
+#     所以它必須在 Agent 碰不到的分支裡
+#   - 但評分器需要它：它要自己推導一次 indication_class，不能讀 Agent
+#     的 assessments
+#   - 寫成宣告式的資料而不是寫死的常數，加一個病人只要加一列
+table: indication_class
+inputs: [problem_code, valve_status]
+
+rules:
+  - id: IC-01
+    when: {problem_code: "I48.0", valve_status: none}
+    action: {indication_class: afib_nonvalvular}
+    source: self_authored
+    source_type: self_authored
+    assumption: >-
+      本案例（P001，Arm A）命中這一條。心房顫動且沒有人工瓣膜 →
+      非瓣膜性心房顫動。
+    reviewed_by: null
+
+  - id: IC-02
+    when: {problem_code: "I48.0", valve_status: mechanical}
+    action: {indication_class: mechanical_valve}
+    source: self_authored
+    source_type: self_authored
+    assumption: >-
+      第二階段的 Arm B 命中這一條：兩個病人只差 valve_status 一個欄位，
+      而 HOLD-02 的 indication_class 是 mechanical_valve ——
+      所以機械瓣膜這一欄壓過心房顫動。
+      第一階段不會用到，但現在就寫進來，因為 Arm A/B 的配對只差這一列，
+      晚寫等於把第二階段的結構風險留到那時才發現。
+    reviewed_by: null
+
+# 刻意不寫的組合：不是漏寫，是不猜。
+#   - valve_status: bioprosthetic
+#     病歷的欄位註解列了這個可能值，但 HOLD 表沒有對應的
+#     indication_class，所以這張表推導不出類別，尚未決定歸到哪一類
+#   - 靜脈血栓
+#     病歷裡沒有對應的診斷代碼，目前也沒有這種案例
+# 這些缺口跟處置指引的年齡區間缺口是同一種：寧可推導不出類別，
+# 不要猜一個看起來合理的答案進去。

@@ -1,0 +1,24 @@
+# 指引 HOLD-04：withhold:aspirin
+# Agent 用 search_guidelines 檢索得到這一份。回傳的欄位只有五個：
+#     guideline_id / decision / title / when / action
+#   - 條件式，不是散文，不可能被讀錯，只可能被挑錯哪一份適用
+#   - 不回傳 以下的欄位絕對不會給 Agent
+#   - when.procedure_category 就是這份指引適用哪一種處置，不另開一個
+#     屬性，適用範圍本來就是條件的一部分
+guideline_id: HOLD-04
+decision: withhold:aspirin
+title: Withholding aspirin before an endoscopic procedure
+when:
+  procedure_category: endoscopic
+  drug: aspirin
+  indication_class: any
+  procedure_risk: any
+action:
+  hold_days: 0
+  substitute: none
+
+#  不回傳給 Agent
+source: self_authored
+source_type: self_authored
+reviewed_by: null
+assumption: 本案例不會命中（P001 沒有服用 aspirin）。放在表裡是為了讓這張表 不只服務一個病人，避免退化成「一個病人剛好對應一列」的填空題。

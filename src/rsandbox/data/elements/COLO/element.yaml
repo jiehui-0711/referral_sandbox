@@ -1,0 +1,236 @@
+# 元素 COLO：大腸鏡檢查
+# 一個元素 = 一個臨床能力包，跨醫院。它宣告自己需要哪些科別與項目，
+# 以及那些科別／項目的規定與診次。
+#   - 科別可以被多個元素宣告（骨科同時被人工膝關節與骨折用到），
+#     載入器會合併，屬性不一致才報錯
+#   - 任務清單用 elements 選它當必要元素，用 distractors 選它當干擾
+#     元素。內容完全一樣，干擾不另外撰寫
+element_id: COLO
+title: 大腸鏡檢查
+
+#  這個元素需要的科別與項目
+departments:
+  # 掛在 H1
+  - dept_id: H1_GI
+    dept: GI
+    name: Gastroenterology               #消化內科
+    status: published
+    block_ids: [H1.GI.1]
+    # 大腸鏡任務的正確科別。大腸鏡是消化內科在做的，
+    # 雖然科名裡沒有大腸兩個字。
+    services:
+      - {code: COL,  name: Colonoscopy,                    slot_type: endoscopy,
+         block_ids: [H1.GI.COL.1, H1.GI.COL.2], prep_block_ids: [H1.GI.COL.2]}
+        # 全大腸鏡。主案例命中這一項
+      - {code: SCOL, name: Colonoscopy under sedation,     slot_type: endoscopy,
+         block_ids: [H1.GI.SCOL.1, H1.GI.SCOL.2, H1.GI.SCOL.3, H1.GI.SCOL.4],
+         prep_block_ids: [H1.GI.SCOL.4], is_sedated: true}
+  # 無痛大腸鏡。COLO-X1 的擾動指向這一項。這一家只有週三下午
+  # 掛在 H2
+  - dept_id: H2_GI
+    dept: GI
+    name: Gastroenterology               #消化內科
+    status: published
+    block_ids: [H2.GI.1]
+    services:
+      - {code: COL,  name: Colonoscopy,                    slot_type: endoscopy,
+         block_ids: [H2.GI.COL.1, H2.GI.COL.2], prep_block_ids: [H2.GI.COL.2]}
+        # 全大腸鏡。週四上午
+      - {code: SCOL, name: Colonoscopy under sedation,     slot_type: endoscopy,
+         block_ids: [H2.GI.SCOL.1, H2.GI.SCOL.2, H2.GI.SCOL.3, H2.GI.SCOL.4],
+         prep_block_ids: [H2.GI.SCOL.4], is_sedated: true}
+  # COLO-X1 的正確答案。週五上午，而且麻醉評估在檢查當天早上做，
+  # 所以不用另外跑一趟
+  # 掛在 H3
+  - dept_id: H3_GI
+    dept: GI
+    name: Gastroenterology               #消化內科
+    status: published
+    block_ids: [H3.GI.1]
+    services:
+      - {code: FIRST, name: Gastroenterology first visit,  slot_type: clinic,
+         block_ids: [H3.GI.1]}
+        # 初診。週一、三上午。大腸鏡（含無痛）都要先來這一趟
+      - {code: COL,  name: Colonoscopy,                    slot_type: endoscopy,
+         block_ids: [H3.GI.COL.1, H3.GI.COL.2], prep_block_ids: [H3.GI.COL.2]}
+      - {code: SCOL, name: Colonoscopy under sedation,     slot_type: endoscopy,
+         block_ids: [H3.GI.SCOL.1, H3.GI.SCOL.2, H3.GI.SCOL.3],
+         prep_block_ids: [H3.GI.COL.2], is_sedated: true}
+  # 掛在 H4
+  - dept_id: H4_GI
+    dept: GI
+    name: Gastroenterology               #消化內科
+    status: published
+    block_ids: [H4.GI.1]
+    services:
+      - {code: COL,  name: Colonoscopy,                    slot_type: endoscopy,
+         block_ids: [H4.GI.COL.1, H4.GI.COL.2], prep_block_ids: [H4.GI.COL.2]}
+        # 清腸藥要本人到本院藥局領，最晚檢查 2 天前。多一趟，而且有期限
+
+#  科別層與項目層的資訊段落
+blocks:
+
+#  消化內科 GI
+- {id: H1.GI.1, scope: department, owner: H1/GI, role: task, reveal: always,
+   text: "Referrals are accepted electronically. Procedures can be booked once the referral has been accepted."}
+  # 接受電子轉診，接受後即可預約
+- {id: H1.GI.COL.1, scope: service, owner: H1/GI/COL, role: task, reveal: always,
+   text: "Tuesday and Thursday mornings."}
+  # 週二、四上午
+- {id: H1.GI.COL.2, scope: service, owner: H1/GI/COL, role: task, reveal: always,
+   text: "Low-residue diet from 2 days before the procedure. The bowel-prep solution is posted to the patient's home."}
+  # 檢查前 2 天低渣飲食。清腸藥寄到家 → 不用多跑一趟
+- {id: H1.GI.SCOL.1, scope: service, owner: H1/GI/SCOL, role: task, reveal: always,
+   text: "Wednesday afternoons only."}
+  # 只有週三下午，不符合只能早上 → COLO-X1 這一家直接不可行
+- {id: H1.GI.SCOL.2, scope: service, owner: H1/GI/SCOL, role: task, reveal: always,
+   text: "Self-pay NT$3,500."}
+  # 自費 3,500
+- {id: H1.GI.SCOL.3, scope: service, owner: H1/GI/SCOL, role: task, reveal: always,
+   text: "A pre-sedation assessment at our anaesthesia clinic (Monday mornings) is required on a separate day before the procedure."}
+  # 須另一天到麻醉科做評估 → 多一趟
+- {id: H1.GI.SCOL.4, scope: service, owner: H1/GI/SCOL, role: task, reveal: always,
+   text: "Low-residue diet from 2 days before. Bowel-prep solution is posted to the patient's home."}
+  # 前 2 天低渣。清腸藥寄到家
+- {id: H2.GI.1, scope: department, owner: H2/GI, role: task, reveal: always,
+   text: "Referrals are accepted electronically. Procedures can be booked once the referral has been accepted."}
+- {id: H2.GI.COL.1, scope: service, owner: H2/GI/COL, role: task, reveal: always,
+   text: "Thursday mornings."}
+  # 週四上午
+- {id: H2.GI.COL.2, scope: service, owner: H2/GI/COL, role: task, reveal: always,
+   text: "Low-residue diet from 3 days before the procedure. The bowel-prep solution is posted to the patient's home."}
+  # 前 3 天低渣（比 H1 多一天）。清腸藥寄到家
+- {id: H2.GI.SCOL.1, scope: service, owner: H2/GI/SCOL, role: task, reveal: always,
+   text: "Friday mornings."}
+  # 週五上午，符合只能早上，而且太太週五有空 → COLO-X1 的正確答案
+- {id: H2.GI.SCOL.2, scope: service, owner: H2/GI/SCOL, role: task, reveal: always,
+   text: "Self-pay NT$4,500."}
+  # 自費 4,500
+- {id: H2.GI.SCOL.3, scope: service, owner: H2/GI/SCOL, role: task, reveal: always,
+   text: "The pre-sedation assessment is done on the morning of the procedure."}
+  # 評估在檢查當天早上 → 不用多跑一趟
+- {id: H2.GI.SCOL.4, scope: service, owner: H2/GI/SCOL, role: task, reveal: always,
+   text: "Low-residue diet from 3 days before. Bowel-prep solution is posted to the patient's home."}
+- {id: H3.GI.1, scope: department, owner: H3/GI, role: task, reveal: always,
+   text: "Colonoscopy, with or without sedation, is booked only after a first visit to our gastroenterology clinic (Monday and Wednesday mornings). The procedure must be at least 5 days after that visit."}
+  #   - 大腸鏡（含無痛）須先初診；檢查在初診 5 天後 → 多一趟 ＋ 時間下限
+  #   - 這一段在科別層。只看項目層的 Agent 完全不會知道
+- {id: H3.GI.COL.1, scope: service, owner: H3/GI/COL, role: task, reveal: always,
+   text: "Wednesday mornings."}
+- {id: H3.GI.COL.2, scope: service, owner: H3/GI/COL, role: task, reveal: always,
+   text: "Low-residue diet on the day before the procedure. The bowel-prep solution is posted to the patient's home."}
+- {id: H3.GI.SCOL.1, scope: service, owner: H3/GI/SCOL, role: task, reveal: always,
+   text: "Tuesday mornings."}
+- {id: H3.GI.SCOL.2, scope: service, owner: H3/GI/SCOL, role: task, reveal: always,
+   text: "Self-pay NT$4,200."}
+- {id: H3.GI.SCOL.3, scope: service, owner: H3/GI/SCOL, role: task, reveal: always,
+   text: "A pre-sedation assessment at our anaesthesia clinic (Thursday mornings) is required on a separate day before the procedure."}
+  # 初診一趟 ＋ 麻醉評估一趟 ＋ 檢查一趟 ＋ 抽血一趟 = 4 趟 × 50 分
+- {id: H4.GI.1, scope: department, owner: H4/GI, role: task, reveal: always,
+   text: "Referrals are accepted electronically. Sedated procedures are not offered at this hospital."}
+  # 接受電子轉診。本院不提供無痛檢查 → COLO-X1 直接出局
+- {id: H4.GI.COL.1, scope: service, owner: H4/GI/COL, role: task, reveal: always,
+   text: "Monday to Friday mornings."}
+- {id: H4.GI.COL.2, scope: service, owner: H4/GI/COL, role: task, reveal: always,
+   text: "Low-residue diet from 2 days before the procedure. The bowel-prep solution must be collected in person by the patient from our pharmacy (weekdays 08:30-17:00), at least 2 days before the procedure."}
+  # 清腸藥須本人到本院藥局領，最晚檢查 2 天前 → 多一趟，而且有期限。
+  # 漏讀會以為 H4 只要 2 趟 26 分，實際 3 趟 42 分，比 H1 還遠
+
+#  診次規則
+slot_rules:
+
+- rule_id: R-H1-GI-COL
+  institution_id: H1
+  dept: GI
+  service: COL
+  weekdays: [Tue, Thu]
+  period: AM
+  capacity: 1
+  date_from: "2026-09-01"
+  date_to: "2026-10-31"
+  prebooked:
+    - {date: "2026-09-03", count: 1}
+  #   - 09-08 刻意不佔用，它是 v3 的最早可行日。v0 仍然選 09-10，
+  #     因為 09-08 的末次服藥日會落在今天（09-03），而說明單要隔天
+  #     才生效
+  #   - 內視鏡 capacity 一律 1，一次只能做一個人
+  #   - 9/3、9/8 已滿 → v0 最早可約 9/10
+  #   - 每一個診次往後七天都要還有另一個可用的，這樣 v1 的延後一週
+  #     不管原本約哪一天都有解
+
+- rule_id: R-H1-GI-SCOL
+  institution_id: H1
+  dept: GI
+  service: SCOL
+  weekdays: [Wed]
+  period: PM
+  capacity: 1
+  date_from: "2026-09-01"
+  date_to: "2026-10-31"
+  # 只有週三下午，不符合只能早上 → COLO-X1 這一家不可行。
+  # 環境不會說這不符合病人的條件，Agent 要自己把兩件事兜起來。
+
+- rule_id: R-H2-GI-COL
+  institution_id: H2
+  dept: GI
+  service: COL
+  weekdays: [Thu]
+  period: AM
+  capacity: 2
+  date_from: "2026-09-01"
+  date_to: "2026-10-31"
+
+- rule_id: R-H2-GI-SCOL
+  institution_id: H2
+  dept: GI
+  service: SCOL
+  weekdays: [Fri]
+  period: AM
+  capacity: 2
+  date_from: "2026-09-01"
+  date_to: "2026-10-31"
+  # COLO-X1 的正確答案。週五上午，太太週五有空，麻醉評估當天早上做完
+
+- rule_id: R-H3-GI-FIRST
+  institution_id: H3
+  dept: GI
+  service: FIRST
+  weekdays: [Mon, Wed]
+  period: AM
+  capacity: 6
+  date_from: "2026-09-01"
+  date_to: "2026-10-31"
+  # 初診。大腸鏡要先來這一趟，而且檢查必須在初診 5 天後
+
+- rule_id: R-H3-GI-COL
+  institution_id: H3
+  dept: GI
+  service: COL
+  weekdays: [Wed]
+  period: AM
+  capacity: 1
+  date_from: "2026-09-01"
+  date_to: "2026-10-31"
+
+- rule_id: R-H3-GI-SCOL
+  institution_id: H3
+  dept: GI
+  service: SCOL
+  weekdays: [Tue]
+  period: AM
+  capacity: 1
+  date_from: "2026-09-01"
+  date_to: "2026-10-31"
+
+- rule_id: R-H4-GI-COL
+  institution_id: H4
+  dept: GI
+  service: COL
+  weekdays: [Mon, Tue, Wed, Thu, Fri]
+  period: AM
+  capacity: 1
+  date_from: "2026-09-15"
+  date_to: "2026-10-31"
+  # 9/15 才開始放號（之前已滿）。所以 H4 雖然最近，日期也最晚
+
+

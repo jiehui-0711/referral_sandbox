@@ -1,0 +1,28 @@
+# 暫存：人工膝關節情境的地點與交通。
+# 這幾筆是為換膝蓋那一組任務（病人 P002，林太太）設計的，但那一組的
+# 情境資料夾還沒建。等它建好之後，這個檔要搬到
+# cases/TKA-01/places.yaml，地點與交通是情境的資料，不是元素的。
+# 元素載入器會讀它，所以只要 TKA 這個元素被選進某個任務，這幾筆就生效。
+places:
+  - {id: PL-P002-HOME, label: "patient's home"}              #林太太家
+  - {id: PL-P002-DAUGHTER, label: "patient's daughter's home"}
+    # 林太太女兒家。只有術後搬去女兒家住那個擾動才加入交通時間，
+    # 在那之前查不到
+
+travel:
+  #  林太太家出發（刻意與陳先生完全相同），這樣兩組任務的負擔數字
+  #  才可以直接比較，差異全部來自規定而不是地理
+  - {from: PL-P002-HOME, to: PL-C0, minutes: 5}
+  - {from: PL-P002-HOME, to: PL-H1, minutes: 10}
+  - {from: PL-P002-HOME, to: PL-H2, minutes: 35}
+  - {from: PL-P002-HOME, to: PL-H3, minutes: 50}
+  - {from: PL-P002-HOME, to: PL-H4, minutes: 8}
+
+  #  女兒家出發
+  - {from: PL-P002-DAUGHTER, to: PL-C0, minutes: 30}
+  - {from: PL-P002-DAUGHTER, to: PL-H1, minutes: 30}
+  - {from: PL-P002-DAUGHTER, to: PL-H2, minutes: 5}
+    # 從女兒家走到 H2 只要 5 分鐘，看起來是復健的最佳解，但
+    # H2.REHAB.1 寫明只收本院開刀的病人，而刀開在 H1。這是陷阱
+  - {from: PL-P002-DAUGHTER, to: PL-H3, minutes: 40}
+  - {from: PL-P002-DAUGHTER, to: PL-H4, minutes: 35}

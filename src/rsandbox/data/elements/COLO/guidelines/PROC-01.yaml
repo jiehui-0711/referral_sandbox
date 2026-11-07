@@ -1,0 +1,29 @@
+# 指引 PROC-01：which_procedure
+# Agent 用 search_guidelines 檢索得到這一份。回傳的欄位只有五個：
+#     guideline_id / decision / title / when / action
+#   - 條件式，不是散文，不可能被讀錯，只可能被挑錯哪一份適用
+#   - 不回傳 以下的欄位絕對不會給 Agent
+#   - when.procedure_category 就是這份指引適用哪一種處置，不另開一個
+#     屬性，適用範圍本來就是條件的一部分
+guideline_id: PROC-01
+decision: which_procedure
+title: 'Which procedure after a positive bowel-screening test: no alarm features, age 45 to 74'
+when:
+  procedure_category: any
+  presentation: bowel_screening
+  screening_result: FIT_positive
+  alarm_features: none
+  age:
+    min: 45
+    max: 74
+action:
+  procedure: colonoscopy_full
+  slot_type: endoscopy
+  urgency: routine
+  deadline_days: 90
+
+#  不回傳給 Agent
+source: self_authored
+source_type: self_authored
+reviewed_by: null
+assumption: 本案例（P001）命中這一條。年齡區間取 45–74 作為篩檢適用範圍， 是本研究自訂的區間，不對應任何國家的篩檢政策。

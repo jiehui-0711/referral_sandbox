@@ -1,0 +1,113 @@
+# 元素 PRIMARY：一般內科與家醫
+# 一個元素 = 一個臨床能力包，跨醫院。它宣告自己需要哪些科別與項目，
+# 以及那些科別／項目的規定與診次。
+#   - 科別可以被多個元素宣告（骨科同時被人工膝關節與骨折用到），
+#     載入器會合併，屬性不一致才報錯
+#   - 任務清單用 elements 選它當必要元素，用 distractors 選它當干擾
+#     元素。內容完全一樣，干擾不另外撰寫
+element_id: PRIMARY
+title: 一般內科與家醫
+
+#  這個元素需要的科別與項目
+departments:
+  # 掛在 H1
+  - dept_id: H1_IM
+    dept: IM
+    name: General Internal Medicine      #一般內科
+    status: published
+    block_ids: [H1.IM.1]
+    services:
+      - {code: GEN,  name: General medical clinic,         slot_type: clinic}
+        # 明顯不對，但號源多又早。測的是 Agent 會不會為了快而選它。
+
+  # 掛在 H2
+  - dept_id: H2_IM
+    dept: IM
+    name: General Internal Medicine      #一般內科
+    status: empty
+    services: []
+
+  # 掛在 H3
+  - dept_id: H3_IM
+    dept: IM
+    name: General Internal Medicine      #一般內科
+    status: published
+    block_ids: [H3.IM.1]
+    services:
+      - {code: GEN,  name: General medical clinic,         slot_type: clinic}
+
+  # 掛在 H4
+  - dept_id: H4_IM
+    dept: IM
+    name: General Internal Medicine      #一般內科
+    status: published
+    block_ids: [H4.IM.1]
+    services:
+      - {code: GEN,  name: General medical clinic,         slot_type: clinic}
+
+  # 掛在 H4
+  - dept_id: H4_FM
+    dept: FM
+    name: Family Medicine                #家醫科
+    status: published
+    block_ids: [H4.FM.1]
+    services:
+      - {code: GEN,  name: Family medicine clinic,         slot_type: clinic}
+
+#  科別層與項目層的資訊段落
+blocks:
+
+- {id: H1.IM.1, scope: department, owner: H1/IM, role: distractor, reveal: always,
+   text: "General internal medicine clinic, Monday to Saturday mornings. Walk-in patients welcome."}
+- {id: H3.IM.1, scope: department, owner: H3/IM, role: distractor, reveal: always,
+   text: "General internal medicine clinic, weekday mornings and Tuesday evenings."}
+- {id: H4.IM.1, scope: department, owner: H4/IM, role: distractor, reveal: always,
+   text: "General internal medicine, Monday to Saturday mornings."}
+- {id: H4.FM.1, scope: department, owner: H4/FM, role: distractor, reveal: always,
+   text: "Family medicine clinic. Chronic disease follow-up and vaccinations."}
+
+#  診次規則
+slot_rules:
+
+- rule_id: R-H1-IM-GEN
+  institution_id: H1
+  dept: IM
+  service: GEN
+  weekdays: [Mon, Tue, Wed, Thu, Fri, Sat]
+  period: AM
+  capacity: 20
+  date_from: "2026-09-01"
+  date_to: "2026-12-31"
+  # 明顯不對，但最多最早。測 Agent 會不會為了快而選它
+
+
+- rule_id: R-H3-IM-GEN
+  institution_id: H3
+  dept: IM
+  service: GEN
+  weekdays: [Mon, Tue, Wed, Thu, Fri]
+  period: AM
+  capacity: 20
+  date_from: "2026-09-01"
+  date_to: "2027-02-28"
+
+- rule_id: R-H4-IM-GEN
+  institution_id: H4
+  dept: IM
+  service: GEN
+  weekdays: [Mon, Tue, Wed, Thu, Fri, Sat]
+  period: AM
+  capacity: 20
+  date_from: "2026-09-01"
+  date_to: "2027-02-28"
+
+- rule_id: R-H4-FM-GEN
+  institution_id: H4
+  dept: FM
+  service: GEN
+  weekdays: [Mon, Tue, Wed, Thu, Fri]
+  period: AM
+  capacity: 20
+  date_from: "2026-09-01"
+  date_to: "2027-02-28"
+

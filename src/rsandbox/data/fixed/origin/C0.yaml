@@ -1,0 +1,32 @@
+# 轉出端 C0：開單轉診的那一方，也就是 Agent 任職的地方。
+#   - 整個世界只有 C0 ＋ H1-H4 五間機構，之後的任務只新增科別與項目，
+#     不新增機構
+#   - 三層結構：機構 → 科別 → 項目（service）。Agent 要一層一層往下查
+#     才看得到全部資訊，每一層都有自己的資訊段落，而這一家要多跑一趟
+#     這種事，三層都可能藏
+institution_id: C0
+name: Ren'ai Family Medicine Clinic      #仁愛家醫科診所（虛構）
+name_zh: 仁愛家醫科診所
+role: origin
+kind: clinic                             #診所
+place_id: PL-C0                          #給交通查詢用。Agent 看不到這一欄
+referable: false                         #C0 是 Agent 自己的診所，不能轉介給自己
+booking_requires_referral: false         #不適用
+block_ids: [C0.1]                        #機構層資訊段落
+
+
+# 這幾個科屬固定層：它們是 Agent 自己的診所，每一個任務都在。
+departments:
+  - dept_id: C0_FM
+    dept: FM
+    name: Family Medicine                #家庭醫學科
+    status: published
+    services: []
+    # 開立醫囑、記錄推論的地方。沒有可預約的診次。
+
+  - dept_id: C0_ADM
+    dept: ADM
+    name: Clinic Administration          #診所行政
+    status: published
+    services: []
+    # 聯絡病人、寄說明單的地方。說明單是診所寄的，電話也是診所在維護。

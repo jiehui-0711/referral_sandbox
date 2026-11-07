@@ -1,0 +1,26 @@
+# H1 仁康醫院：區域醫院。兩個任務的正確答案都落在這一家。
+# 診次掛在科別與項目底下，不直接掛在醫院底下，所以查號源是三跳：
+# 處置 colonoscopy_full → 診次型別 endoscopy → 哪一科提供 → 該科的診次
+#
+# 欄位：dept / name / status / services
+#   status: published（有內容）／ empty（科存在但沒公布資訊）
+#   科不存在的表示法是這個檔案裡沒有那一列，工具回 unknown_department。
+#
+# services 的欄位：
+#   code        項目代碼，Agent 看得到
+#   name        英文名，Agent 看得到
+#   slot_type   診次型別。Agent 靠它從「我要做 endoscopy」找到該去哪一科
+#   block_ids   項目層資訊段落
+#   stay_nights 住院晚數。Agent 看不到這一欄，要從資訊段落的英文讀出來
+#   is_sedated  要不要帶入 SED-01 的禁食與陪同事項
+institution_id: H1
+name: Renkang Hospital                   #仁康醫院（虛構）
+name_zh: 仁康醫院
+role: receiving
+kind: hospital
+place_id: PL-H1
+referable: true                          #可以被轉介
+booking_requires_referral: true          #訂號前必須有一張有效轉診。行政前置條件
+block_ids: [H1.1, H1.2, H1.3]
+report_turnaround_days: 5                #檢查完成後多久出報告（回覆迴路用，第一階段未用到）
+

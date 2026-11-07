@@ -1,0 +1,201 @@
+# 執行期資料表的 schema：任務開始時全空，由 Agent 一步步填滿。
+# 每個欄位的宣告只描述型別：
+#     type, required, nullable, enum, description, snapshot_of
+# 工具寫入時，executor 照這份宣告檢查型別，只檢查型別。
+# 沒有任何欄位會被自動計算或跟著別的欄位變動。
+
+assessments:
+  description: 推導帳本。Agent 每算出一個結論就記一筆。
+  key: assessment_id
+  fields:
+    assessment_id: {type: string, required: true}
+    key:           {type: string, required: true}
+    value:         {type: string, required: true}
+    evidence:      {type: list, required: true,
+                    description: 參考了病歷的哪些欄位。可分辨「真的推理過」與「猜對了」}
+    rule_id:       {type: string, nullable: true,
+                    description: 依據哪一份指引（選填）}
+    created_at:    {type: date, required: true}
+
+appointments:
+  description: 預約單。
+  key: appointment_id
+  fields:
+    appointment_id: {type: string, required: true}
+    slot_id:        {type: string, required: true}
+    dept_id:        {type: string, required: true, snapshot_of: "slots[slot_id].dept_id"}
+    slot_type:      {type: string, required: true, snapshot_of: "slots[slot_id].slot_type"}
+    date:           {type: date, required: true, snapshot_of: "slots[slot_id].date"}
+    status:         {type: string, required: true, enum: [booked, done, cancelled]}
+    history:        {type: list, required: true, description: "所有改過的 slot_id 與 date"}
+  # dept_id / slot_type / date 是抄寫而不是外鍵：這筆預約記的是預約
+  # 當下的診次型別，之後診次資料改了也不會跟著變。
+  # snapshot_of 只是註記來源，不是 generated column，欄位寫進去之後
+  # 不會跟著 slots 變動，載入器也不會據此重算。
+
+hold_orders:
+  description: 停藥醫囑。
+  key: order_id
+  fields:
+    order_id:      {type: string, required: true}
+    drug:          {type: string, required: true}
+    hold_days:     {type: int, required: true}
+    last_dose_date: {type: date}
+    # 完全沒有約束的欄位，一個鍵都不能多。不驗它跟 appointments.date 的關係、
+    # 不驗它跟 hold_days 的關係、不驗它是不是已經過去。
+    substitute:    {type: string, required: true}
+    status:        {type: string, required: true, enum: [active, superseded]}
+    supersedes:    {type: string, nullable: true}
+    issued_at:     {type: date, required: true}
+  # 不填 supersedes 就會留下兩份 active。資料庫不阻止，
+  # 同一種藥底下會同時有兩張生效中的醫囑。
+
+lab_orders:
+  description: 術前抽血單。
+  key: lab_order_id
+  fields:
+    lab_order_id: {type: string, required: true}
+    test:         {type: string, required: true}
+    draw_date:    {type: date}
+    # 第二個衍生值，同樣完全不被驗證。
+    status:       {type: string, required: true, enum: [active, superseded]}
+    issued_at:    {type: date, required: true}
+
+prep_instructions:
+  description: 準備說明單。寄給病人的，含快照。
+  key: instruction_id
+  fields:
+    instruction_id: {type: string, required: true}
+    delivered_at:   {type: date, required: true}
+    snapshot:       {type: object, required: true,
+                     description: "{procedure_date, appointments, holds, lab_orders}。寄出當下複製一份，之後永遠不變"}
+  #   - 寄什麼不由參數決定，而是由寄出當下的狀態決定：所有 booked 的
+  #     預約、所有 active 的停藥單與抽血單。停藥資訊依藥名分項，
+  #     不會互相覆寫
+  #   - snapshot 同樣不被任何機制更新：寄出後沒有任何機制會去更新它
+
+contact_log:
+  description: 與病人的所有互動。
+  key: log_id
+  fields:
+    log_id:     {type: string, required: true}
+    direction:  {type: string, required: true, enum: [inbound, outbound]}
+    content:    {type: string, required: true}
+    created_at: {type: date, required: true}
+
+referrals:
+  description: 轉診單。含快照：送出當下的醫囑副本，凍結不變。
+  key: referral_id
+  fields:
+    referral_id:    {type: string, required: true}
+    institution_id: {type: string, required: true}
+    dept:           {type: string, required: true}
+    service:        {type: string, required: true}
+    status:         {type: string, required: true, enum: [active, withdrawn]}
+    version:        {type: int, required: true}
+    notes:          {type: string, nullable: true}
+    snapshot:       {type: object, required: true,
+                     description: "送出當下 active 的停藥單與抽血單。凍結"}
+    sent_at:        {type: date, required: true}
+  #   - 這是第四個會過期的副本：預約日變了 → 醫囑要改 → 說明單要重寄
+  #     → 轉診單也要 update。環境一個都不會提醒
+  #   - 送出成功會觸發揭露：reveal = on_referral_accepted 的段落翻成可見
+
+series:
+  description: 療程。一次訂好幾場（復健 12 次）。
+  key: series_id
+  fields:
+    series_id:      {type: string, required: true}
+    institution_id: {type: string, required: true}
+    dept:           {type: string, required: true}
+    service:        {type: string, required: true}
+    weekdays:       {type: list, required: true}
+    count:          {type: int, required: true}
+    status:         {type: string, required: true, enum: [booked, cancelled]}
+    booked_at:      {type: date, required: true}
+  # 整組訂或整組不訂，不會留下半套的療程。
+
+escalations:
+  description: 上報醫師的紀錄。
+  key: escalation_id
+  fields:
+    escalation_id: {type: string, required: true}
+    question:      {type: string, required: true}
+    evidence:      {type: list, required: true}
+    created_at:    {type: date, required: true}
+  # 指引庫回答不了的臨床問題，正確答案就是上報。
+  # 醫師不會回覆，上報是一筆紀錄，不是等待回覆的請求。
+  # 這件事寫在工具回傳裡（所有任務都一樣），所以不會卡死。
+
+summaries:
+  description: 寄給病人的方案整理。
+  key: summary_id
+  fields:
+    summary_id:  {type: string, required: true}
+    summary:     {type: list, required: true}
+    question:    {type: string, required: true}
+    reply:       {type: string, required: true}
+    created_at:  {type: date, required: true}
+  # summary 裡的 evidence 記的是 Agent 引用了哪些段落編號，
+  # 不是它自己算出的數字。
+
+change_log:
+  description: 只追加的狀態變更紀錄。
+  key: seq
+  fields:
+    seq:    {type: int, required: true}
+    at:     {type: date, required: true}
+    tool:   {type: string, required: true}
+    table:  {type: string, required: true}
+    key:    {type: string, required: true}
+    field:  {type: string, required: true}
+    before: {type: object, nullable: true}
+    after:  {type: object, nullable: true}
+  #   - 用途是回答某一天當時的狀態是什麼：擾動發生之前 Agent 選的是
+  #     哪一家、舊的那張停藥醫囑何時被取代。終態只有現在，回答不了這些
+  #   - 怎麼產生：Session.call() 在 handler 前後各拍一次狀態，攤平成
+  #     差異，不是每一支 handler 自己寫，所以 handler 不知道它存在
+  #   - Agent 讀不到：get_case_status 回的是目前狀態，不是歷史
+  #   - 它不是約束，只記錄已經發生的事，不阻止任何事發生
+
+tool_call_log:
+  description: 工具呼叫紀錄。
+  key: seq
+  fields:
+    seq:    {type: int, required: true}
+    tool:   {type: string, required: true}
+    node:   {type: string, nullable: true, description: 當時在哪個節點}
+    args:   {type: object, required: true}
+    ok:     {type: bool, required: true}
+    reason: {type: string, nullable: true}
+    data:   {type: object, nullable: true}
+    at:     {type: date, required: true}
+  # 用途是看得出 Agent 有沒有回去查過指引，就算答案跟上次一樣，
+  # 有查跟沒查是兩回事。
+
+boundary_violations:
+  description: 模擬代理人越線的紀錄。有任何一筆，整個 episode 無效。
+  key: null
+  fields:
+    at:        {type: date, required: true}
+    agent_id:  {type: string, required: true}
+    violation: {type: string, required: true}
+  # 模擬代理人說出不該說的話是環境的問題，那一次執行的資料整份不能用。
+
+observations:
+  description: 每一回合 Agent 看到什麼。主迴圈寫入。
+  key: turn
+  fields:
+    turn:   {type: int, required: true}
+    at:     {type: date, required: true}
+    text:   {type: string, required: true}
+    events: {type: list, required: true, description: 這一回合觸發了哪些事件型別}
+  #   - 讀 transcript 時要能看到 Agent 當時知道什麼
+  #   - 字串掃描掃的是模板，這裡存的是渲染後的實際文字
+  #   - 事件哪天觸發要有紀錄
+
+sim_clock:
+  description: 模擬時鐘。
+  key: null
+  fields:
+    today: {type: date, required: true}

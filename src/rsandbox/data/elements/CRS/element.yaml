@@ -1,0 +1,72 @@
+# 元素 CRS：大腸直腸外科
+# 一個元素 = 一個臨床能力包，跨醫院。它宣告自己需要哪些科別與項目，
+# 以及那些科別／項目的規定與診次。
+#   - 科別可以被多個元素宣告（骨科同時被人工膝關節與骨折用到），
+#     載入器會合併，屬性不一致才報錯
+#   - 任務清單用 elements 選它當必要元素，用 distractors 選它當干擾
+#     元素。內容完全一樣，干擾不另外撰寫
+element_id: CRS
+title: 大腸直腸外科
+
+#  這個元素需要的科別與項目
+departments:
+  # 掛在 H1
+  - dept_id: H1_CR
+    dept: CR
+    name: Colorectal Surgery             #大腸直腸外科
+    status: published
+    block_ids: [H1.CR.1]
+    # 最強的誘餌。科名裡有大腸兩個字，語意上比消化內科更像答案，
+    # 但它提供的是門診與手術診次，沒有內視鏡診次。
+    # 設計意圖：錯誤選項必須看起來比正確選項更吸引人，
+    #   否則錯誤率趨近於零，這個變項就白設了。
+    # 它是刻意保留的誘餌，憑科名猜去大腸直腸外科那一條走法完全靠它。
+    services:
+      - {code: CRC,  name: Colorectal clinic,              slot_type: clinic,
+         block_ids: [H1.CR.CRC.1]}
+      - {code: CRS,  name: Colorectal surgery,             slot_type: surgery,
+         block_ids: [H1.CR.CRS.1]}
+
+#  科別層與項目層的資訊段落
+blocks:
+
+- {id: H1.CR.1, scope: department, owner: H1/CR, role: distractor, reveal: always,
+   text: "Surgical management of colorectal disease. Referrals are accepted electronically."}
+  # 大腸直腸疾病的外科治療。科名裡有大腸兩個字，比消化內科更像答案，
+  # 但它做的是門診與手術，沒有內視鏡診次
+- {id: H1.CR.CRC.1, scope: service, owner: H1/CR/CRC, role: distractor, reveal: always,
+   text: "Monday to Friday mornings."}
+  # 平日上午。號源多又早，測 Agent 會不會為了快而選錯科
+- {id: H1.CR.CRS.1, scope: service, owner: H1/CR/CRS, role: distractor, reveal: always,
+   text: "Operating lists on Monday and Thursday."}
+  # 週一、四開刀
+
+
+#  診次規則
+slot_rules:
+
+#  誘餌科別：大腸直腸外科
+
+- rule_id: R-H1-CR-CRC
+  institution_id: H1
+  dept: CR
+  service: CRC
+  weekdays: [Mon, Tue, Wed, Thu, Fri]
+  period: AM
+  capacity: 8
+  date_from: "2026-09-01"
+  date_to: "2026-10-31"
+  # 號源多又早（每天都有、capacity 8）。
+  # 訂這一科不會被擋，它是真實存在的科、真實的號源。
+  # 錯在 slot_type 是 clinic 不是 endoscopy，而環境不吭聲。
+
+- rule_id: R-H1-CR-CRS
+  institution_id: H1
+  dept: CR
+  service: CRS
+  weekdays: [Mon, Thu]
+  period: AM
+  capacity: 2
+  date_from: "2026-09-01"
+  date_to: "2026-10-31"
+

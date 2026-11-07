@@ -1,0 +1,107 @@
+# 元素 FRACTURE：骨折與運動傷害
+# 一個元素 = 一個臨床能力包，跨醫院。它宣告自己需要哪些科別與項目，
+# 以及那些科別／項目的規定與診次。
+#   - 科別可以被多個元素宣告（骨科同時被人工膝關節與骨折用到），
+#     載入器會合併，屬性不一致才報錯
+#   - 任務清單用 elements 選它當必要元素，用 distractors 選它當干擾
+#     元素。內容完全一樣，干擾不另外撰寫
+element_id: FRACTURE
+title: 骨折與運動傷害
+
+#  這個元素需要的科別與項目
+departments:
+  # 掛在 H1
+  - dept_id: H1_ORTH
+    dept: ORTH
+    name: Orthopaedics                   #骨科
+    status: published
+    block_ids: [H1.ORTH.1]
+    services:
+      - {code: FRAC, name: Fracture clinic,                slot_type: clinic,
+         block_ids: [H1.ORTH.FRAC.1]}
+        # 骨折門診。干擾項
+
+  # 掛在 H2
+  - dept_id: H2_ORTH
+    dept: ORTH
+    name: Orthopaedics                   #骨科
+    status: published
+    block_ids: [H2.ORTH.1]
+    services:
+      - {code: SPORT, name: Sports injury clinic,          slot_type: clinic,
+         block_ids: [H2.ORTH.SPORT.1]}
+        # 運動傷害門診。干擾項
+
+  # 掛在 H4
+  - dept_id: H4_ORTH
+    dept: ORTH
+    name: Orthopaedics                   #骨科
+    status: published
+    block_ids: [H4.ORTH.1]
+    services:
+      - {code: FRAC, name: Fracture clinic,                slot_type: clinic,
+         block_ids: [H4.ORTH.FRAC.1]}
+      - {code: SPORT, name: Sports injury clinic,          slot_type: clinic,
+         block_ids: [H4.ORTH.SPORT.1]}
+    # 沒有 TKA。H4.ORTH.1 明文寫本院不做關節置換。
+    # Agent 要讀出來，而不是查到空清單才發現。
+
+#  科別層與項目層的資訊段落
+blocks:
+
+- {id: H1.ORTH.FRAC.1, scope: service, owner: H1/ORTH/FRAC, role: distractor, reveal: always,
+   text: "Fracture clinic, Monday to Friday mornings. Walk-in for urgent cases."}
+
+- {id: H2.ORTH.SPORT.1, scope: service, owner: H2/ORTH/SPORT, role: distractor, reveal: always,
+   text: "Sports injury clinic, Saturday mornings."}
+
+- {id: H4.ORTH.FRAC.1, scope: service, owner: H4/ORTH/FRAC, role: distractor, reveal: always,
+   text: "Fracture clinic, weekday afternoons."}
+- {id: H4.ORTH.SPORT.1, scope: service, owner: H4/ORTH/SPORT, role: distractor, reveal: always,
+   text: "Sports injury clinic, Wednesday evenings."}
+
+
+#  診次規則
+slot_rules:
+
+- rule_id: R-H1-ORTH-FRAC
+  institution_id: H1
+  dept: ORTH
+  service: FRAC
+  weekdays: [Mon, Tue, Wed, Thu, Fri]
+  period: AM
+  capacity: 10
+  date_from: "2026-09-01"
+  date_to: "2027-01-31"
+
+- rule_id: R-H4-ORTH-FRAC
+  institution_id: H4
+  dept: ORTH
+  service: FRAC
+  weekdays: [Mon, Tue, Wed, Thu, Fri]
+  period: PM
+  capacity: 10
+  date_from: "2026-09-01"
+  date_to: "2027-01-31"
+
+- rule_id: R-H4-ORTH-SPORT
+  institution_id: H4
+  dept: ORTH
+  service: SPORT
+  weekdays: [Wed]
+  period: PM
+  capacity: 8
+  date_from: "2026-09-01"
+  date_to: "2027-01-31"
+
+- rule_id: R-H2-ORTH-SPORT
+  institution_id: H2
+  dept: ORTH
+  service: SPORT
+  weekdays: [Sat]
+  period: AM
+  capacity: 8
+  date_from: "2026-09-01"
+  date_to: "2027-01-31"
+
+

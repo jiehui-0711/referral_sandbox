@@ -1,0 +1,25 @@
+# 指引 HOLD-01：withhold:warfarin
+# Agent 用 search_guidelines 檢索得到這一份。回傳的欄位只有五個：
+#     guideline_id / decision / title / when / action
+#   - 條件式，不是散文，不可能被讀錯，只可能被挑錯哪一份適用
+#   - 不回傳 以下的欄位絕對不會給 Agent
+#   - when.procedure_category 就是這份指引適用哪一種處置，不另開一個
+#     屬性，適用範圍本來就是條件的一部分
+guideline_id: HOLD-01
+decision: withhold:warfarin
+title: 'Withholding warfarin before a high bleeding-risk endoscopic procedure: non-valvular atrial fibrillation'
+when:
+  procedure_category: endoscopic
+  drug: warfarin
+  indication_class: afib_nonvalvular
+  procedure_risk: high
+action:
+  hold_days: 5
+  substitute: none
+  resume_days_after: 1
+
+#  不回傳給 Agent
+source: self_authored
+source_type: self_authored
+reviewed_by: null
+assumption: 本案例命中這一條。自訂設定：停 5 天、不需替代藥物、術後第 1 天恢復。 5 這個數字維持不變，因為主案例的所有算例都建立在它上面，要好讀。

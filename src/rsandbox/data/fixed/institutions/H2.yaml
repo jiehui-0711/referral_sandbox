@@ -1,0 +1,17 @@
+# H2 北辰醫學中心：最大、最快、最貴、最遠。
+# 診次最多、等最短，但每次就診 400 元（全場最貴）、單程 35 分
+# （比 H1 遠 25 分），而且兩條規定會各多製造一趟或一段遠路：
+#   H2.3            術前抽血只收本院 → 抽血那一趟要跑到 H2
+#   H2.ORTH.TKA.2   出院後前 4 週復健必須在本院 → 8 趟遠路
+# 兩條都不是直接寫多跑一趟，要 Agent 自己推。
+institution_id: H2
+name: Beichen Medical Centre             #北辰醫學中心（虛構）
+name_zh: 北辰醫學中心
+role: receiving
+kind: hospital
+place_id: PL-H2
+referable: true
+booking_requires_referral: true
+block_ids: [H2.1, H2.2, H2.3]
+report_turnaround_days: 3
+

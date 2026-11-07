@@ -1,0 +1,30 @@
+# 指引 HOLD-02：withhold:warfarin
+# Agent 用 search_guidelines 檢索得到這一份。回傳的欄位只有五個：
+#     guideline_id / decision / title / when / action
+#   - 條件式，不是散文，不可能被讀錯，只可能被挑錯哪一份適用
+#   - 不回傳 以下的欄位絕對不會給 Agent
+#   - when.procedure_category 就是這份指引適用哪一種處置，不另開一個
+#     屬性，適用範圍本來就是條件的一部分
+guideline_id: HOLD-02
+decision: withhold:warfarin
+title: 'Withholding warfarin before a high bleeding-risk endoscopic procedure: mechanical heart valve'
+when:
+  procedure_category: endoscopic
+  drug: warfarin
+  indication_class: mechanical_valve
+  procedure_risk: high
+action:
+  hold_days: 5
+  substitute: LMWH
+  substitute_start_days_before: 3
+
+#  不回傳給 Agent
+source: self_authored
+source_type: self_authored
+reviewed_by: null
+assumption: >-
+  本案例不會命中。第一階段就放進指引庫，理由與 PROC-02 相同：
+  若庫裡沒有機械瓣膜這一條，Agent 把 indication_class 推成
+  mechanical_valve 時會得到「查無此規則」，那等於環境免費告訴它
+  「你推錯了」。有了這一條，同樣的錯誤會得到看似合理但錯誤的答案，
+  Agent 會照樣往下走。

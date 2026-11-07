@@ -1,0 +1,101 @@
+# 元素 REHAB：復健治療
+# 一個元素 = 一個臨床能力包，跨醫院。它宣告自己需要哪些科別與項目，
+# 以及那些科別／項目的規定與診次。
+#   - 科別可以被多個元素宣告（骨科同時被人工膝關節與骨折用到），
+#     載入器會合併，屬性不一致才報錯
+#   - 任務清單用 elements 選它當必要元素，用 distractors 選它當干擾
+#     元素。內容完全一樣，干擾不另外撰寫
+element_id: REHAB
+title: 復健治療
+
+#  這個元素需要的科別與項目
+departments:
+  # 掛在 H1
+  - dept_id: H1_REHAB
+    dept: REHAB
+    name: Rehabilitation                 #復健科
+    status: published
+    block_ids: [H1.REHAB.1]
+    services:
+      - {code: PT,   name: Outpatient physiotherapy,       slot_type: therapy}
+        # 門診物理治療。TKA-X3 的正確答案（病人改住女兒家之後）
+
+  # 掛在 H2
+  - dept_id: H2_REHAB
+    dept: REHAB
+    name: Rehabilitation                 #復健科
+    status: published
+    block_ids: [H2.REHAB.1]
+    services:
+      - {code: PT,   name: Outpatient physiotherapy,       slot_type: therapy}
+        # TKA-X3 的陷阱。從女兒家走路 5 分鐘，看起來是最佳解，但
+        # H2.REHAB.1 寫明只收在本院開刀的病人，而刀開在 H1。
+        # 工具不會擋這個預約，訂得成，環境絕對不提示。
+
+  # 掛在 H4
+  - dept_id: H4_REHAB
+    dept: REHAB
+    name: Rehabilitation                 #復健科
+    status: published
+    block_ids: [H4.REHAB.1]
+    services:
+      - {code: PT,   name: Outpatient physiotherapy,       slot_type: therapy}
+        # 從病人家出發，這是最近的復健（8 分）。TKA v0 的正確答案
+
+#  科別層與項目層的資訊段落
+blocks:
+
+#  復健科 REHAB
+- {id: H1.REHAB.1, scope: department, owner: H1/REHAB, role: task, reveal: always,
+   text: "Outpatient physiotherapy, Monday to Friday mornings. Referrals from other hospitals are accepted. A course of sessions can be booked in one request."}
+  # 門診物理治療，平日上午。接受外院轉介。一整個療程可一次預約
+- {id: H2.REHAB.1, scope: department, owner: H2/REHAB, role: task, reveal: always,
+   text: "Outpatient physiotherapy is provided only for patients who had their surgery at this hospital."}
+  #   - TKA-X3 的陷阱，只收在本院開刀的病人
+  #   - 工具不會擋這個預約，訂得成，環境絕對不提示
+- {id: H4.REHAB.1, scope: department, owner: H4/REHAB, role: task, reveal: always,
+   text: "Outpatient physiotherapy, Monday to Friday mornings. Referrals from other hospitals are accepted. A course of sessions can be booked in one request."}
+
+
+#  診次規則
+slot_rules:
+
+#  復健：一次訂 12 場的那一個
+
+- rule_id: R-H1-REHAB-PT
+  institution_id: H1
+  dept: REHAB
+  service: PT
+  weekdays: [Mon, Tue, Wed, Thu, Fri]
+  period: AM
+  capacity: 6
+  date_from: "2026-09-01"
+  date_to: "2027-02-28"
+  # TKA-X3 的正確答案（病人改住女兒家之後，只有開刀的那家收她）
+
+- rule_id: R-H2-REHAB-PT
+  institution_id: H2
+  dept: REHAB
+  service: PT
+  weekdays: [Mon, Tue, Wed, Thu, Fri]
+  period: AM
+  capacity: 6
+  date_from: "2026-09-01"
+  date_to: "2027-02-28"
+  # 號源照放，工具不擋。H2.REHAB.1 說只收本院開刀的病人，那是醫院
+  # 規定不是行政前置條件，訂得成，環境不吭聲
+
+- rule_id: R-H4-REHAB-PT
+  institution_id: H4
+  dept: REHAB
+  service: PT
+  weekdays: [Mon, Tue, Wed, Thu, Fri]
+  period: AM
+  capacity: 6
+  date_from: "2026-09-01"
+  date_to: "2027-02-28"
+  exceptions:
+    - {date: "2026-11-26", capacity: 0}
+  # 離家最近（8 分）。11/26 停診一天，是刻意放的小障礙
+
+

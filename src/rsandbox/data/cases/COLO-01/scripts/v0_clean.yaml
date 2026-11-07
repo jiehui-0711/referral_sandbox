@@ -1,0 +1,157 @@
+# v0_clean 的腳本：額外的檢查素材，不是任務定義的一部分。
+#   - 腳本是這一題的一個標準答案：照它走得完，代表這個任務設計得
+#     出來、走得到終點。但 Agent 不必照它走
+#   - 它跟任務檔分開：任務檔是世界發生了什麼，腳本是可以怎麼走。
+#     一個任務沒有腳本也是合法的任務
+variant: v0_clean
+
+reference:
+
+  #  第一天 09-01：讀病歷、查指引、巡四家醫院、問病人
+  - {tool: get_patient_record}
+
+  # 四欄位三跳轉推出來的，沒有工具可代勞，整條鏈唯一的純推理
+  - tool: record_assessment
+    args:
+      key: indication_class
+      value: afib_nonvalvular
+      evidence: ["medications[Warfarin].indication_ref", "problems[I48.0].label",
+                 "valve_status"]
+      rule_id: null
+
+  - {tool: search_guidelines, args:
+       {query: "which procedure after a positive bowel screening test no alarm features"}}
+  - tool: record_assessment
+    args: {key: procedure, value: colonoscopy_full,
+           evidence: ["screening.result", "alarm_features", "age"], rule_id: PROC-01}
+
+  - {tool: search_guidelines, args:
+       {query: "bleeding risk of a full colonoscopy endoscopic procedure"}}
+  - tool: record_assessment
+    args: {key: procedure_risk, value: high, evidence: ["PROC-01.procedure"],
+           rule_id: RISK-01}
+
+  - {tool: search_guidelines, args:
+       {query: "withholding warfarin before a high bleeding risk endoscopic procedure non-valvular atrial fibrillation"}}
+  - tool: record_assessment
+    args: {key: hold_days, value: "5",
+           evidence: ["medications[Warfarin]", "indication_class", "procedure_risk"],
+           rule_id: HOLD-01}
+
+  - {tool: search_guidelines, args:
+       {query: "pre-procedure blood test when an anticoagulant has been withheld"}}
+  - tool: record_assessment
+    args: {key: preop_lab, value: "INR, 1 day before",
+           evidence: ["HOLD-01.hold_days"], rule_id: LAB-01}
+
+  - {tool: list_institutions, args: {}}
+
+  #  巡 H1
+  - {tool: get_institution_info, args: {institution_id: H1}}
+  - {tool: get_department_info, args: {institution_id: H1, dept: GI}}
+  - {tool: get_service_info, args: {institution_id: H1, dept: GI, service: COL}}
+  - {tool: query_slots, args: {institution_id: H1, dept: GI, service: COL,
+                               date_from: "2026-09-02", date_to: "2026-09-30"}}
+
+  #  巡 H2
+  - {tool: get_institution_info, args: {institution_id: H2}}
+  # 這一步讀到 H2.3（術前抽血須在本院，不收外院報告），多一趟 35 分鐘
+  - {tool: get_department_info, args: {institution_id: H2, dept: GI}}
+  - {tool: get_service_info, args: {institution_id: H2, dept: GI, service: COL}}
+  - {tool: query_slots, args: {institution_id: H2, dept: GI, service: COL,
+                               date_from: "2026-09-02", date_to: "2026-09-30"}}
+
+  #  巡 H3
+  - {tool: get_institution_info, args: {institution_id: H3}}
+  - {tool: get_department_info, args: {institution_id: H3, dept: GI}}
+  # 這一步讀到 H3.GI.1（要先初診，而且檢查在初診 5 天後）。它在科別
+  # 層，只查項目層的 Agent 不會知道要多跑一趟
+  - {tool: get_service_info, args: {institution_id: H3, dept: GI, service: COL}}
+  - {tool: query_slots, args: {institution_id: H3, dept: GI, service: COL,
+                               date_from: "2026-09-02", date_to: "2026-09-30"}}
+
+  #  巡 H4
+  - {tool: get_institution_info, args: {institution_id: H4}}
+  - {tool: get_department_info, args: {institution_id: H4, dept: GI}}
+  - {tool: get_service_info, args: {institution_id: H4, dept: GI, service: COL}}
+  # 這一步讀到 H4.GI.COL.2（清腸藥須本人到本院藥局領，最晚檢查 2 天
+  # 前）。漏讀會以為 H4 只要 2 趟 26 分，實際 3 趟 42 分
+  - {tool: query_slots, args: {institution_id: H4, dept: GI, service: COL,
+                               date_from: "2026-09-02", date_to: "2026-09-30"}}
+
+  #  回診所：算交通、問病人
+  - {tool: get_travel_time, args: {from: PL-P001-HOME, to: H1}}
+  - {tool: get_travel_time, args: {from: PL-P001-HOME, to: H4}}
+  - tool: consult_patient
+    args:
+      summary:
+        - {option: "H1 Renkang 2026-09-10",
+           points: ["2 visits", "NT$450", "30 minutes of travel"],
+           evidence: ["H1.2", "H1.3", "H1.GI.COL.1", "H1.GI.COL.2"]}
+        - {option: "H2 Beichen 2026-09-17",
+           points: ["2 visits", "NT$800", "140 minutes of travel",
+                    "the blood test must be done at that hospital"],
+           evidence: ["H2.2", "H2.3", "H2.GI.COL.1"]}
+        - {option: "H3 Songhe 2026-09-09",
+           points: ["3 visits, including a first visit before the procedure",
+                    "NT$900", "210 minutes of travel"],
+           evidence: ["H3.2", "H3.3", "H3.GI.1", "H3.GI.COL.1"]}
+        - {option: "H4 Lanxi 2026-09-15",
+           points: ["3 visits, including collecting the bowel preparation in person",
+                    "NT$450", "42 minutes of travel"],
+           evidence: ["H4.2", "H4.3", "H4.GI.COL.1", "H4.GI.COL.2"]}
+      question: "Is there anything that matters to you about where and when this is done?"
+  # 病人回：希望離家近、只能早上 → 比較時要算交通時間，
+  # 而且只能早上成為硬條件
+
+  - tool: record_assessment
+    args: {key: chosen_institution, value: H1,
+           evidence: ["H1.2", "H1.3", "H4.GI.COL.2", "patient.preference"],
+           rule_id: null}
+  - {tool: end_turn, args: {note: "Options reviewed with the patient."}}
+
+  #  第二天 09-02：送轉診、訂號、開醫囑、寄說明單
+  - {tool: create_referral, args: {institution_id: H1, dept: GI, service: COL,
+                                   notes: "FIT positive, no alarm features."}}
+  - {tool: book_appointment, args: {slot_id: H1-GI-COL-20260910-AM}}
+
+  # 這兩個數字從這一刻起就依附在 09-10 上面了，但寫下去的只有結果，
+  # 沒有算式。
+  - {tool: issue_hold_order, args: {drug: Warfarin, hold_days: 5,
+                                    last_dose_date: "2026-09-05",
+                                    substitute: none, supersedes: null}}
+  # site 是 C0：H1.3 收外院報告，而 C0 離家最近、最便宜
+  - {tool: order_preop_lab, args: {test: INR, draw_date: "2026-09-09", site: C0}}
+  - {tool: send_prep_instructions, args: {}}
+  - {tool: end_turn, args: {note: "Referral arranged."}}
+
+# v0 本身的失敗版：憑大腸鏡 → 大腸直腸外科的字面聯想直接訂號。
+#   一路成功到底，不會收到任何錯誤，那一科真的有號，只是型別不對。
+#   差別在最終資料裡：預約的 slot_type 是 clinic，而 PROC-01 要的是 endoscopy。
+alternatives:
+  - id: alt_wrong_department
+    description: 憑科名猜去大腸直腸外科，號源真實、型別錯誤
+    steps:
+      - {tool: get_patient_record}
+      - {tool: search_guidelines, args:
+           {query: "which procedure after a positive bowel screening test no alarm features"}}
+      # ✗ 這裡沒有讀科別清單，直接憑科名進了大腸直腸外科
+      - {tool: query_slots, args: {institution_id: H1, dept: CR, service: CRC,
+                                   date_from: "2026-09-02", date_to: "2026-09-30"}}
+      - {tool: create_referral, args: {institution_id: H1, dept: CR, service: CRC}}
+      - {tool: book_appointment, args: {slot_id: H1-CR-CRC-20260911-AM}}
+      - {tool: search_guidelines, args:
+           {query: "withholding warfarin before a high bleeding risk endoscopic procedure non-valvular atrial fibrillation"}}
+      # 09-11 − 5 = 09-06。算術完全正確，錯的是它依附的那個日期
+      - {tool: issue_hold_order, args: {drug: Warfarin, hold_days: 5,
+                                        last_dose_date: "2026-09-06",
+                                        substitute: none, supersedes: null}}
+      - {tool: order_preop_lab, args: {test: INR, draw_date: "2026-09-10", site: C0}}
+      - {tool: send_prep_instructions, args: {}}
+      - {tool: end_turn, args: {note: "Arranged."}}
+
+  - id: alt_did_nothing
+    description: 什麼都沒做
+    steps:
+      - {tool: get_patient_record}
+      - {tool: end_turn, args: {note: "Noted."}}

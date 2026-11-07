@@ -1,0 +1,256 @@
+# 科別層這一層的工具：讀科別與項目公布的規定，查號、訂號、改期、轉診。
+# 查科別與項目的規定、查號源、轉診、訂號、改期、取消。
+#   - 這一層是通用定義：四家醫院的訂號方式一樣，就共用這一支，
+#     不重複四份
+#   - 某一家真的不一樣（例如無痛要另外填麻醉同意欄位）時，在那個元素
+#     的 tools/ 裡放一支專屬工具，名字帶擁有者：H2_GI_COL__book_sedated
+#   - 資料夾名字是資訊層級，不是位置權限：所有工具都可以從任何節點
+#     呼叫，詳見 loaders/graph.py 的 LEVEL_DIRS
+tools:
+
+  - tool_id: book_appointment                     #預約一個診次
+    label: book_appointment
+    kind: write
+    description: "Book a slot."
+                                                  # 預約一個診次
+    tags: [book, appointment, slot, schedule, reserve]
+    permissions: [referral_agent]
+    params:
+      slot_id: {type: string, required: true, description: "Slot id, as returned by query_slots."}
+    returns: {appointment_id: string, slot_id: string, institution_id: string,
+              dept: string, service: string, slot_type: string,
+              date: string, period: string, status: string}
+    precondition:
+      - {type: admin, rule: "args.slot_id in slots", on_fail: unknown_slot}
+      - {type: admin, rule: "slot.status == open", on_fail: slot_unavailable}
+      - {type: admin, rule: "slot.date > today", on_fail: slot_unavailable}
+      - {type: admin, rule: "slot.booked_count < slot.capacity", on_fail: capacity_full}
+      - {type: admin, rule: "referral_exists_if_required", on_fail: prerequisite_missing}
+    side_effects: [{writes: appointments}, {updates: "slots.booked_count"}]
+    handler: runtime.handlers.hospital.book_appointment
+    version: v1
+    #   - 唯一的臨床相關檢查是 referral_exists_if_required，而它是純
+    #     行政的：這家醫院宣告訂號前要有轉診，而這個案子沒有 → 做不到。
+    #     它不檢查轉診是不是轉去對的科，轉去大腸直腸外科再訂那一科的
+    #     門診號，一路 ok；slot_type 不對只留在最終資料裡
+    #   - 今天不能訂（slot.date > today）
+
+  - tool_id: book_series                          #一次預約一整個療程
+    label: book_series
+    kind: write
+    description: "Book a course of appointments for a service in one request."
+                                                  # 一次把一整個療程的診次訂完
+    tags: [book, series, course, repeat, weekly, physiotherapy, sessions]
+    permissions: [referral_agent]
+    params:
+      institution_id: {type: string, required: true, enum_from: world.institutions}
+      dept:       {type: string, required: true, description: "Department code, as listed by get_institution_info."}
+      service:    {type: string, required: true, description: "Service code, as listed by get_department_info."}
+      first_date: {type: date,   required: true}
+      weekdays:   {type: list,   required: true, items: {type: string}, description: "Weekdays as three-letter codes: Mon, Tue, Wed, Thu, Fri, Sat, Sun."}
+      count:      {type: int,    required: true}
+    returns: {series_id: string, dates: list}
+    precondition:
+      - {type: admin, rule: "args.service exists", on_fail: unknown_service}
+      - {type: admin, rule: "referral_exists_if_required", on_fail: prerequisite_missing}
+      - {type: admin, rule: "series_fits", on_fail: capacity_full}
+    side_effects: [{writes: series}, {writes: appointments},
+                   {updates: "slots.booked_count"}]
+    handler: runtime.handlers.hospital.book_series
+    version: v1
+    #   - 復健是每週 2 次做 6 週共 12 次，一次訂完，不是呼叫 12 次
+    #   - 整組訂或整組不訂：任何一次排不到就回 capacity_full，一筆都不寫
+    #   - 錨點移動時整組要取消重訂（TKA-X1：出院日從 11/20 變成 12/18）
+
+  - tool_id: cancel_appointment                   #取消預約
+    label: cancel_appointment
+    kind: write
+    description: "Cancel an appointment, or a whole series."
+                                                  # 取消一筆預約，或整個療程
+    tags: [cancel, appointment, series, drop, remove]
+    permissions: [referral_agent]
+    params:
+      appointment_id: {type: string, required: false, nullable: true, description: "Appointment id, as returned by get_case_status."}
+      series_id:      {type: string, required: false, nullable: true, description: "Series id, as returned by get_case_status."}
+    returns: {cancelled: list}
+    precondition:
+      - {type: admin, rule: "args.appointment_id xor args.series_id", on_fail: bad_arguments}
+      - {type: admin, rule: "cancel target exists", on_fail: not_found}
+    side_effects: [{updates: appointments}, {updates: series},
+                   {updates: "slots.booked_count"}]
+    handler: runtime.handlers.hospital.cancel_appointment
+    version: v1
+    #   - 傳 series_id 會取消整組還沒到的場次，已經發生的不動
+    #   - 取消預約不會連帶撤銷任何醫囑。手術取消了停藥單還 active，
+    #     病人照舊停藥
+
+  - tool_id: create_referral                      #送出一張轉診單
+    label: create_referral
+    kind: write
+    description: "Send a referral to this department for a service."
+                                                  # 送一張轉診單到這一科的某個項目
+    tags: [referral, refer, send, request, accept]
+    permissions: [referral_agent]
+    params:
+      institution_id: {type: string, required: true, enum_from: world.institutions}
+      dept:    {type: string, required: true, description: "Department code, as listed by get_institution_info."}
+      service: {type: string, required: true, description: "Service code, as listed by get_department_info."}
+      notes:   {type: string, required: false, nullable: true}
+    returns: {referral_id: string, status: string, message: string,
+              new_information: list}
+    precondition:
+      - {type: admin, rule: "args.institution is referable", on_fail: not_referable}
+      - {type: admin, rule: "args.service exists", on_fail: unknown_service}
+    side_effects: [{writes: referrals}, {reveals: info_blocks}]
+    handler: runtime.handlers.referral.create_referral
+    version: v1
+    #   - 揭露機制就掛在這裡。reveal = on_referral_accepted 的段落，在
+    #     轉診被接受之前完全查不到；接受之後，那些段落的全文會附在
+    #     new_information 裡回傳，之後 get_*_info 也查得到
+    #   - TKA-X4 靠它：送出轉診才知道 H1 要求手術前 3 個月內有牙科檢查，
+    #     而指引只說 6 個月
+    #   - 快照：送出當下的病歷摘要 ＋ 所有 active 的醫囑，複製一份凍結。
+    #     之後醫囑改了這份副本不會跟著變，所以 Agent 改完醫囑要
+    #     update_referral，否則對方醫院手上是舊計畫
+    #   - C0 是 Agent 自己的診所，referable = false → not_referable
+
+  - tool_id: get_department_info                  #查這一科的科別層資訊
+    label: get_department_info
+    kind: read
+    description: "Return the published information for this department and the list of its services."
+                                                  # 回傳本科公布的資訊，以及項目清單
+    tags: [department, clinic, information, services, what, offered]
+    permissions: [referral_agent]
+    params:
+      institution_id: {type: string, required: true, enum_from: world.institutions}
+      dept: {type: string, required: true, description: "Department code, as listed by get_institution_info."}
+    returns: {institution_id: string, dept: string, name: string,
+              information: list, services: list}
+    precondition:
+      - {type: admin, rule: "args.department exists", on_fail: unknown_department}
+    side_effects: []
+    handler: runtime.handlers.world.get_department_info
+    version: v1
+    #   - 科別層藏的是要先初診這一類前置條件。H3.GI.1 寫明大腸鏡要先
+    #     初診、而且檢查必須在初診 5 天後；只查項目層的 Agent 只會看到
+    #     週三上午有大腸鏡，不知道還要多跑一趟
+    #   - status 是 empty 的科回 "No information published for this
+    #     department."，那跟科不存在是兩件事，後者回 unknown_department
+
+  - tool_id: get_service_info                     #查這個項目的項目層資訊
+    label: get_service_info
+    kind: read
+    description: "Return the published information for this service."
+                                                  # 回傳這個檢查／治療項目公布的資訊
+    tags: [service, procedure, information, preparation, times, cost]
+    permissions: [referral_agent]
+    params:
+      institution_id: {type: string, required: true, enum_from: world.institutions}
+      dept: {type: string, required: true, description: "Department code, as listed by get_institution_info."}
+      service: {type: string, required: true, description: "Service code, as listed by get_department_info."}
+    returns: {institution_id: string, dept: string, service: string,
+              name: string, information: list}
+    precondition:
+      - {type: admin, rule: "args.service exists", on_fail: unknown_service}
+    side_effects: []
+    handler: runtime.handlers.world.get_service_info
+    version: v1
+    # 項目層藏的是準備事項。H4.GI.COL.2（清腸藥須本人到本院藥局領，
+    # 最晚檢查 2 天前）是多一趟，而且有期限。漏讀會以為 H4 只要 2 趟
+    # 26 分，實際是 3 趟 42 分，比 H1 還遠。
+
+  - tool_id: query_slots                          #查這一科這個項目的可約診次
+    label: query_slots
+    kind: read
+    description: "List the available slots for a service between two dates."
+                                                  # 列出某個項目在兩個日期之間還有空位的診次
+    tags: [slots, availability, booking, dates, when, free]
+    permissions: [referral_agent]
+    params:
+      institution_id: {type: string, required: true, enum_from: world.institutions}
+      dept: {type: string, required: true, description: "Department code, as listed by get_institution_info."}
+      service: {type: string, required: true, description: "Service code, as listed by get_department_info."}
+      date_from: {type: date, required: true}
+      date_to: {type: date, required: true}
+    returns: {slots: list}                        #每筆有 slot_id / date / weekday / period
+    precondition:
+      - {type: admin, rule: "args.service exists", on_fail: unknown_service}
+    side_effects: []
+    handler: runtime.handlers.world.query_slots
+    version: v1
+    #   - 只列還有空位的診次，不回傳容量數字，容量是醫院的內部資訊
+    #   - period（AM/PM）一定要回
+    #   - 它不檢查這個項目適不適合這個病人。拿骨科的手術診次去查也會
+    #     回傳真實的號源，要不要用是臨床判斷，工具不做
+
+  - tool_id: reschedule_appointment               #改期
+    label: reschedule_appointment
+    kind: write
+    description: "Move an appointment to a different slot."
+                                                  # 把一筆預約移到另一個診次
+    tags: [reschedule, move, appointment, slot, change, date]
+    permissions: [referral_agent]
+    params:
+      appointment_id: {type: string, required: true, description: "Appointment id, as returned by get_case_status."}
+      new_slot_id:    {type: string, required: true, description: "Slot id to move it to, as returned by query_slots."}
+    returns: {appointment_id: string, slot_id: string, institution_id: string,
+              dept: string, service: string, slot_type: string,
+              date: string, period: string, status: string}
+    precondition:
+      - {type: admin, rule: "args.appointment_id in appointments", on_fail: bad_arguments}
+      - {type: admin, rule: "appointment.status == booked", on_fail: no_active_appointment}
+      - {type: admin, rule: "args.new_slot_id in slots", on_fail: unknown_slot}
+      - {type: admin, rule: "new_slot.status == open", on_fail: slot_unavailable}
+      - {type: admin, rule: "new_slot.date > today", on_fail: slot_unavailable}
+      - {type: admin, rule: "new_slot.booked_count < new_slot.capacity", on_fail: capacity_full}
+      - {type: admin, rule: "same_service", on_fail: prerequisite_missing}
+    side_effects: [{writes: appointments}, {updates: "slots.booked_count"},
+                   {notifies: patient}]
+    handler: runtime.handlers.hospital.reschedule_appointment
+    version: v1
+    #   - 這個工具只改一個日期欄位。醫囑、抽血單、說明單、轉診單，它
+    #     一個都沒動，因為它根本不知道那些東西存在。這件事只寫在註解
+    #     裡，不出現在 description
+    #   - same_service：只能在同一個項目之間移動。換醫院要走取消 →
+    #     撤回轉診 → 送新轉診 → 重新訂號，四步
+    #   - notifies: patient 是環境自動發的改期通知，內容只有新日期，
+    #     不提任何用藥或依賴關係
+
+  - tool_id: update_referral                      #更新轉診單
+    label: update_referral
+    kind: write
+    description: "Update a referral so that it carries the current orders."
+                                                  # 更新轉診單，讓它帶上目前的醫囑
+    tags: [referral, update, amend, revise, resend]
+    permissions: [referral_agent]
+    params:
+      referral_id: {type: string, required: true, description: "Referral id, as returned by get_case_status."}
+      notes: {type: string, required: false, nullable: true}
+    returns: {referral_id: string, version: int}
+    precondition:
+      - {type: admin, rule: "args.referral_id in referrals", on_fail: not_found}
+      - {type: admin, rule: "referral_is_active", on_fail: not_found}
+    side_effects: [{writes: referrals}]
+    handler: runtime.handlers.referral.update_referral
+    version: v1
+    # 產生新 version，快照重新附上目前 active 的醫囑。
+    # 這是第四個會過期的副本：預約日變了 → 醫囑要改 → 說明單要重寄 →
+    # 轉診單也要更新。環境一個都不會提醒。
+
+  - tool_id: withdraw_referral                    #撤回轉診單
+    label: withdraw_referral
+    kind: write
+    description: "Withdraw a referral."
+                                                  # 撤回一張轉診單
+    tags: [referral, withdraw, cancel, revoke]
+    permissions: [referral_agent]
+    params:
+      referral_id: {type: string, required: true, description: "Referral id, as returned by get_case_status."}
+    returns: {referral_id: string, status: string}
+    precondition:
+      - {type: admin, rule: "args.referral_id in referrals", on_fail: not_found}
+    side_effects: [{writes: referrals}]
+    handler: runtime.handlers.referral.withdraw_referral
+    version: v1
+    # 換醫院的時候要做：撤回舊的、送新的。COLO-X1 從 H1 改到 H2 就是。
+

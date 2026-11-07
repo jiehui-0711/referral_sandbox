@@ -1,0 +1,88 @@
+# 元素 ENDO：內分泌（血糖）
+# 一個元素 = 一個臨床能力包，跨醫院。它宣告自己需要哪些科別與項目，
+# 以及那些科別／項目的規定與診次。
+#   - 科別可以被多個元素宣告（骨科同時被人工膝關節與骨折用到），
+#     載入器會合併，屬性不一致才報錯
+#   - 任務清單用 elements 選它當必要元素，用 distractors 選它當干擾
+#     元素。內容完全一樣，干擾不另外撰寫
+element_id: ENDO
+title: 內分泌（血糖）
+
+#  這個元素需要的科別與項目
+departments:
+  # 掛在 H1
+  - dept_id: H1_ENDO
+    dept: ENDO
+    name: Endocrinology                  #內分泌科
+    status: published
+    block_ids: [H1.ENDO.1]
+    services:
+      - {code: DM,   name: Diabetes clinic,                slot_type: clinic}
+        # 糖尿病門診。TKA-X2 的正確答案（HbA1c 過高要轉介）
+
+  # 掛在 H2
+  - dept_id: H2_ENDO
+    dept: ENDO
+    name: Endocrinology                  #內分泌科
+    status: published
+    block_ids: [H2.ENDO.1]
+    services:
+      - {code: DM,   name: Diabetes clinic,                slot_type: clinic}
+
+  # 掛在 H3
+  - dept_id: H3_ENDO
+    dept: ENDO
+    name: Endocrinology                  #內分泌科
+    status: published
+    block_ids: [H3.ENDO.1]
+    services:
+      - {code: DM,   name: Diabetes clinic,                slot_type: clinic}
+
+#  科別層與項目層的資訊段落
+blocks:
+
+#  其他科別
+- {id: H1.ENDO.1, scope: department, owner: H1/ENDO, role: task, reveal: always,
+   text: "Diabetes clinic, Tuesday and Thursday mornings. Referrals are accepted electronically."}
+  # TKA-X2 的正確答案（HbA1c 8.4% → 轉介糖尿病門診）。離家最近的那一家
+- {id: H2.ENDO.1, scope: department, owner: H2/ENDO, role: distractor, reveal: always,
+   text: "Endocrinology and diabetes clinic, Monday to Friday mornings."}
+- {id: H3.ENDO.1, scope: department, owner: H3/ENDO, role: distractor, reveal: always,
+   text: "Diabetes clinic, Wednesday mornings."}
+
+#  診次規則
+slot_rules:
+
+#  糖尿病門診：TKA-X2 用
+
+- rule_id: R-H1-ENDO-DM
+  institution_id: H1
+  dept: ENDO
+  service: DM
+  weekdays: [Tue, Thu]
+  period: AM
+  capacity: 8
+  date_from: "2026-11-05"
+  date_to: "2027-02-28"
+
+- rule_id: R-H2-ENDO-DM
+  institution_id: H2
+  dept: ENDO
+  service: DM
+  weekdays: [Mon, Tue, Wed, Thu, Fri]
+  period: AM
+  capacity: 8
+  date_from: "2026-11-05"
+  date_to: "2027-02-28"
+
+- rule_id: R-H3-ENDO-DM
+  institution_id: H3
+  dept: ENDO
+  service: DM
+  weekdays: [Wed]
+  period: AM
+  capacity: 8
+  date_from: "2026-11-05"
+  date_to: "2027-02-28"
+
+

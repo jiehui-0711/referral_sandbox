@@ -1,0 +1,251 @@
+# 轉出端診所 C0 的工具：只有在自己的診所才能用。
+# 病歷、醫囑、抽血單、說明單、與病人溝通、上報醫師、列出可轉診機構。
+#   - 所有臨床動作都在這裡：病人是診所的病人，醫囑是診所開的，
+#     說明單是診所寄的
+#   - 資料夾名字是資訊層級的分組，不是位置權限：所有工具都可以從任何
+#     節點呼叫，詳見 loaders/graph.py 的 LEVEL_DIRS
+tools:
+
+  - tool_id: ask_patient                          #問病人一個問題
+    label: ask_patient
+    kind: read                                    #不留紀錄，所以是讀取類
+    description: "Ask the patient a question and return their reply."
+                                                  # 問病人一個問題，回傳他的回答
+    tags: [ask, patient, question, confirm, check, adherence]
+    permissions: [referral_agent]
+    params:
+      question: {type: string, required: true}
+    returns: {answer: string}
+    precondition: []
+    side_effects: []
+    handler: runtime.handlers.clinic.ask_patient
+    version: v1
+    #   - 病人由一個 LLM 扮演，讀情境資料夾的 patient_doc.yaml。它只
+    #     回答被問到的，問得夠不夠精準決定問不問得出來
+    #   - 行為規則寫在 data/prompts/patient_agent.txt，不寫成程式判斷
+    #   - 問你有在吃什麼藥，回有在吃血液的藥跟血壓藥，是實話，但不會
+    #     帶出我自己提前停藥了那一句，要問到依從性的層次才會
+    #   - 一個字都不提示該問什麼
+
+  - tool_id: cancel_order                         #撤銷一張醫囑
+    label: cancel_order
+    kind: write
+    description: "Cancel a hold order or a blood test order."
+                                                  # 撤銷一張停藥醫囑或抽血單
+    tags: [cancel, order, withdraw, stop, revoke]
+    permissions: [referral_agent]
+    params:
+      order_id: {type: string, required: true, description: "Hold order or lab order id, as returned by get_case_status."}
+    returns: {order_id: string, status: string}
+    precondition:
+      - {type: admin, rule: "args.order_id in orders", on_fail: not_found}
+      - {type: admin, rule: "order_is_cancellable", on_fail: already_completed}
+    side_effects: [{updates: hold_orders}, {updates: lab_orders}]
+    handler: runtime.handlers.clinic.cancel_order
+    version: v1
+    #   - 撤銷不等於取代。處置取消的時候（例如 TKA-X2 血糖過高、手術
+    #     延後），停藥醫囑要撤回而不是換一張新的
+    #   - 已經抽過的血不能撤銷 → already_completed。純行政
+
+  - tool_id: consult_patient                      #把方案整理給病人，並問他在意什麼
+    label: consult_patient
+    kind: write                                   #寫入類：它會留下一筆紀錄
+    description: "Send the patient a summary of the options and ask a question."
+                                                  # 把方案整理寄給病人，並問一個問題
+    tags: [consult, options, summary, patient, preference, ask, explain]
+    permissions: [referral_agent]
+    params:
+      summary: {type: list, required: true, items: {type: object, properties: {
+                  option: {type: string, required: true},
+                  points: {type: list, required: true, items: {type: string}},
+                  evidence: {type: list, required: true, items: {type: string}}}}}
+                                                  # 方案整理。每個方案要列重點與依據編號
+      question: {type: string, required: true}    #想問病人什麼
+    returns: {summary_id: string, reply: string}
+    precondition:
+      - {type: admin, rule: "args.summary is well formed", on_fail: bad_arguments}
+    side_effects: [{writes: summaries}, {notifies: patient}]
+    handler: runtime.handlers.clinic.consult_patient
+    version: v1
+    #   - evidence 記的是 Agent 在整理裡引用了哪些段落編號，記下來的是
+    #     那些段落編號，不是 Agent 自己算出的數字
+    #   - 問句照樣交給病人模型，它依 patient_agent.txt 的規則回答。問到
+    #     他在意什麼的時候，提示詞要求他原文貼出 What matters to me 那段
+
+  - tool_id: escalate_to_physician                #上報醫師
+    label: escalate_to_physician
+    kind: write
+    description: "Escalate a clinical question to the physician."
+                                                  # 把一個臨床問題上報給醫師
+    tags: [escalate, physician, doctor, question, unclear, guidance]
+    permissions: [referral_agent]
+    params:
+      question: {type: string, required: true}
+      evidence: {type: list, required: true, items: {type: string}, description: "Record field paths or information-block ids you relied on."}
+    returns: {escalation_id: string, message: string}
+    precondition: []
+    side_effects: [{writes: escalations}]
+    handler: runtime.handlers.clinic.escalate_to_physician
+    version: v1
+    #   - 同一個決定恰好一份指引適用，零份也可以，那代表正確答案就是
+    #     上報醫師。指引庫確實有涵蓋不到的病人（年齡在 45-74 之外、
+    #     warfarin 的用藥原因不是心房顫動也不是機械瓣膜）
+    #   - 上報不會卡死：醫師不回覆，回傳的訊息會明說這件事，所有任務的
+    #     回傳都一樣。時間照常前進，之後連續幾天沒有寫入，回合自然結束
+
+  - tool_id: get_patient_record                   #取病歷
+    label: get_patient_record
+    kind: read
+    description: "Return the full medical record of the patient in this case."
+                                                  # 回傳本案病人的完整病歷
+    tags: [patient, record, chart, history, medications, labs, screening]
+    permissions: [referral_agent]
+    params: {}                                    #不收參數：一個案子一個病人
+    returns: {record: object}
+    precondition: []
+    side_effects: []
+    handler: runtime.handlers.records.get_patient_record
+    version: v1
+    # 病歷裡沒有結論欄位：沒有 indication_class、沒有 procedure_risk、
+    # 沒有 last_dose_date。那三個都是 Agent 要自己算出來的。
+
+  - tool_id: issue_hold_order                     #開一張停藥醫囑
+    label: issue_hold_order
+    kind: write
+    description: "Issue a medication hold order."
+                                                  # 開立一張停藥醫囑
+    tags: [order, hold, medication, withhold, stop, issue, supersede]
+    permissions: [referral_agent]
+    params:
+      drug:           {type: string, required: true}
+      hold_days:      {type: int,    required: true}
+      last_dose_date: {type: date,   required: true}
+                                                  # 衍生值。完全不被驗證
+      substitute:     {type: string, required: true}
+      supersedes:     {type: string, required: false, nullable: true, description: "Id of the order this one replaces. Omit if it replaces nothing."}
+                                                  # 要取代哪一張舊醫囑
+    returns: {order_id: string, status: string,
+              authorised_by: string, authorisation: string}
+    precondition:
+      - {type: admin, rule: "args.supersedes is null or args.supersedes in hold_orders",
+         on_fail: not_found}
+      - {type: admin, rule: "superseded_target_is_active", on_fail: already_superseded}
+    side_effects: [{writes: hold_orders}]
+    handler: runtime.handlers.clinic.issue_hold_order
+    version: v1
+    #   - last_dose_date 不驗證跟預約日的關係、不驗跟 hold_days 的關係、
+    #     不驗它是不是已經過去
+    #   - 不填 supersedes 會留下兩張 active 醫囑，環境不阻止，同一種藥
+    #     底下會同時有兩張生效中的
+    #   - 醫師核可一律同意，不檢查內容、不提醒任何事
+
+  - tool_id: list_institutions                    #列出可以轉介的機構
+    label: list_institutions
+    kind: read
+    description: "List the institutions that referrals can be sent to."
+                                                  # 列出可以轉介過去的機構
+    tags: [hospitals, institutions, list, where, options]
+    permissions: [referral_agent]
+    params: {}
+    returns: {institutions: list}                 #每筆有 id / name / kind
+    precondition: []
+    side_effects: []
+    handler: runtime.handlers.world.list_institutions
+    version: v1
+    #   - 只列 referable = true 的。C0 是 Agent 自己的診所，不會出現在
+    #     清單裡
+    #   - 回傳不含任何資訊段落，想知道一家醫院的事要走過去查
+
+  - tool_id: order_preop_lab                      #開一張術前抽血單
+    label: order_preop_lab
+    kind: write
+    description: "Order a pre-procedure blood test for a given date at a given site."
+                                                  # 開立一張指定日期、指定地點的術前抽血單
+    tags: [order, lab, blood test, preop, INR, draw, site]
+    permissions: [referral_agent]
+    params:
+      test:       {type: string, required: true}
+      draw_date:  {type: date,   required: true}  #第二個衍生值。同樣不被驗證
+      site:       {type: string, required: true, enum_from: world.institutions}
+                                                  # 在哪裡抽。第三個衍生值
+      supersedes: {type: string, required: false, nullable: true, description: "Id of the order this one replaces. Omit if it replaces nothing."}
+    returns: {lab_order_id: string, status: string}
+    precondition:
+      - {type: admin, rule: "args.site in institutions", on_fail: not_found}
+      - {type: admin, rule: "args.supersedes is null or args.supersedes in lab_orders",
+         on_fail: not_found}
+      - {type: admin, rule: "superseded_lab_is_active", on_fail: already_superseded}
+    side_effects: [{writes: lab_orders}]
+    handler: runtime.handlers.hospital.order_preop_lab
+    version: v1
+    #   - 三個偏移量刻意不同：停藥 D−5、抽血 D−1，而 site 根本不是日期。
+    #     所以把所有日期一起加七天這種策略在延後剛好七天時會矇對，換成
+    #     別的天數就露餡，而 site 永遠矇不到
+    #   - site 不驗證對方醫院收不收外院報告。H2.3 寫明不收，但把 site
+    #     填成 C0 照樣 ok
+    #   - 抽血日早於今天也照收。那張單永遠不會被抽，環境不吭聲
+
+  - tool_id: record_assessment                    #記錄一個推論
+    label: record_assessment
+    kind: write
+    description: "Record a clinical assessment with the evidence it is based on."
+                                                  # 記錄一個臨床判斷，以及它的依據
+    tags: [assessment, record, note, reasoning, evidence, conclusion]
+    permissions: [referral_agent]
+    params:
+      key: {type: string, required: true, description: "What you are judging."}
+      value: {type: string, required: true, description: "Your conclusion."}
+      evidence: {type: list, required: true, items: {type: string}, description: "Record field paths or information-block ids you relied on."}
+                                                  # 依據。病歷欄位路徑或段落編號
+      rule_id: {type: string, required: false, nullable: true, description: "guideline_id you relied on, as returned by search_guidelines."}
+                                                  # 依據的指引編號，例如 HOLD-01
+    returns: {assessment_id: string}
+    precondition: []
+    side_effects: [{writes: assessments}]
+    handler: runtime.handlers.clinic.record_assessment
+    version: v1
+    #   - 這是 Agent 自己的記事本，不是世界狀態，所以它不算在這一回合
+    #     有沒有推進世界裡
+    #   - 環境不檢查 value 對不對，也不檢查 evidence 撐不撐得住 value
+
+  - tool_id: send_prep_instructions               #寄說明單給病人
+    label: send_prep_instructions
+    kind: write
+    description: "Send the patient a letter with the current appointments and orders."
+                                                  # 把目前的預約與醫囑寄一份說明單給病人
+    tags: [instructions, send, patient, preparation, deliver, letter]
+    permissions: [referral_agent]
+    params: {}
+    returns: {instruction_id: string, delivered_at: string,
+              withhold: list, blood_tests: list, text: string}
+    precondition: []
+    side_effects: [{writes: prep_instructions}, {notifies: patient}]
+    handler: runtime.handlers.clinic.send_prep_instructions
+    version: v1
+    # 最重要的一支。
+    #   - 快照：寄出的那一刻，把目前所有 booked 的預約、目前所有 active
+    #     的停藥單與抽血單複製一份凍結。之後預約改期、醫囑被取代，這份
+    #     快照都不會變，就跟寄出去的紙本衛教單一樣
+    #   - 生效時點：從送達日的隔天起影響病人行為（病人早上服藥，當天才
+    #     到的紙改變不了當天的行為）
+    #   - 不帶參數：寄什麼由當下的狀態決定，不由參數決定。停藥資訊依
+    #     藥名分項列出，不覆寫；superseded / cancelled 的單不會出現
+    #   - 沒有在停藥清單裡出現的藥，等於告訴病人照常吃。所以手術取消後
+    #     寄一份沒有停藥醫囑的說明單，就是在叫病人恢復服藥
+
+  - tool_id: update_patient_contact               #更新病人電話
+    label: update_patient_contact
+    kind: write
+    description: "Update the patient's phone number."
+                                                  # 更新病人的電話號碼
+    tags: [contact, phone, update, details]
+    permissions: [referral_agent]
+    params:
+      phone: {type: string, required: true}
+    returns: {patient_id: string, phone: string}
+    precondition: []
+    side_effects: [{updates: records}]
+    handler: runtime.handlers.clinic.update_patient_contact
+    version: v1
+    # 負控制的對照組：改電話該做，但不該連帶重算任何日期。
+    # 哪些要跟著改、哪些不要，靠它跟停藥日的對比測出來。

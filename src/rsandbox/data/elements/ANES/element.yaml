@@ -1,0 +1,72 @@
+# 元素 ANES：麻醉評估
+# 一個元素 = 一個臨床能力包，跨醫院。它宣告自己需要哪些科別與項目，
+# 以及那些科別／項目的規定與診次。
+#   - 科別可以被多個元素宣告（骨科同時被人工膝關節與骨折用到），
+#     載入器會合併，屬性不一致才報錯
+#   - 任務清單用 elements 選它當必要元素，用 distractors 選它當干擾
+#     元素。內容完全一樣，干擾不另外撰寫
+element_id: ANES
+title: 麻醉評估
+
+#  這個元素需要的科別與項目
+departments:
+  # 掛在 H1
+  - dept_id: H1_ANES
+    dept: ANES
+    name: Anaesthesia                    #麻醉科
+    status: published
+    block_ids: [H1.ANES.1]
+    services:
+      - {code: ASSESS, name: Pre-sedation assessment,      slot_type: clinic}
+        # 麻醉前評估。COLO-X1 改成無痛之後，這一家要另外跑一趟（週一上午）
+
+  # 掛在 H2
+  - dept_id: H2_ANES
+    dept: ANES
+    name: Anaesthesia                    #麻醉科
+    status: empty
+    services: []
+  # 空白科。跟 H2.GI.SCOL.3（評估在檢查當天早上做）一致：
+  #   不需要另外掛麻醉科的號。
+  # 掛在 H3
+  - dept_id: H3_ANES
+    dept: ANES
+    name: Anaesthesia                    #麻醉科
+    status: published
+    block_ids: [H3.ANES.1]
+    services:
+      - {code: ASSESS, name: Pre-sedation assessment,      slot_type: clinic}
+        # 麻醉前評估，週四上午。無痛大腸鏡要另外跑這一趟
+
+#  科別層與項目層的資訊段落
+blocks:
+
+- {id: H1.ANES.1, scope: department, owner: H1/ANES, role: task, reveal: always,
+   text: "Pre-sedation assessment clinic for procedures booked in other departments. Monday mornings."}
+- {id: H3.ANES.1, scope: department, owner: H3/ANES, role: task, reveal: always,
+   text: "Pre-sedation assessment clinic. Thursday mornings."}
+
+#  診次規則
+slot_rules:
+
+- rule_id: R-H1-ANES-ASSESS
+  institution_id: H1
+  dept: ANES
+  service: ASSESS
+  weekdays: [Mon]
+  period: AM
+  capacity: 4
+  date_from: "2026-09-01"
+  date_to: "2026-10-31"
+  # 麻醉前評估。H1 的無痛要另外跑這一趟
+
+- rule_id: R-H3-ANES-ASSESS
+  institution_id: H3
+  dept: ANES
+  service: ASSESS
+  weekdays: [Thu]
+  period: AM
+  capacity: 4
+  date_from: "2026-09-01"
+  date_to: "2026-10-31"
+

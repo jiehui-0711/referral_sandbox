@@ -1,0 +1,136 @@
+# 全域層級的工具：任何節點都能用。
+# 移動、查指引、交通時間、日期計算、案件現況、結束今天。
+#   - 資料夾名字是資訊層級的分組，不是位置權限：所有工具都可以從任何
+#     節點呼叫，詳見 loaders/graph.py 的 LEVEL_DIRS
+#   - 查指引是全域的：Agent 不管站在哪裡都要能查臨床決定的依據
+tools:
+
+  - tool_id: date_calc                            #日期算術
+    label: date_calc
+    kind: read
+    description: "Add days to a date, or count the days between two dates. Returns the weekday."
+                                                  # 日期加減天數，或算兩個日期相差幾天。回傳星期幾
+    tags: [date, calendar, days, weekday, calculate, before, after]
+    permissions: [referral_agent]
+    params:
+      date: {type: date, required: true}
+      add_days: {type: int, required: false, nullable: true}
+      date_to: {type: date, required: false, nullable: true}
+    returns: {date: string, weekday: string, days: int}
+    precondition:
+      - {type: admin, rule: "args.add_days xor args.date_to", on_fail: bad_arguments}
+    side_effects: []
+    handler: runtime.handlers.world.date_calc
+    version: v1
+    # 回傳 weekday 是必要的：醫院的規定全部寫成週二、四上午。
+
+  - tool_id: end_turn                             #結束今天
+    label: end_turn
+    kind: control
+    description: "End your turn for today and hand time back."
+                                                  # 結束今天的回合，把時間交還給世界
+    tags: [end, done, finish, turn, today]
+    permissions: [referral_agent]
+    params:
+      note: {type: string, required: false, nullable: true}
+                                                  # 選填的備註
+    returns: {ended: bool, note: string}
+    precondition: []
+    side_effects: []
+    handler: runtime.handlers.core.end_turn
+    version: v1
+    # 時鐘只在這裡前進。note 會留進呼叫紀錄。
+
+  - tool_id: get_case_status                      #看目前的案件狀況
+    label: get_case_status
+    kind: read
+    description: "Return the patient this case is for, and its current referrals, appointments, orders and letters."
+                                                  # 回傳本案的病人，以及目前的轉診、預約、醫囑與已寄說明單
+    tags: [status, current, summary, appointments, orders, referrals, patient]
+    permissions: [referral_agent]
+    params: {}
+    returns: {patient_id: string, patient_name: string,
+              referrals: list, appointments: list, series: list,
+              hold_orders: list, lab_orders: list, instructions: list,
+              escalations: list}
+    precondition: []
+    side_effects: []
+    handler: runtime.handlers.clinic.get_case_status
+    version: v1
+    # 回的是目前狀態，不是歷史，一致性要 Agent 自己比。
+    # 變更紀錄（change_log）沒有任何工具回傳。
+
+  - tool_id: get_travel_time                      #查兩地之間的單程交通時間
+    label: get_travel_time
+    kind: read
+    description: "Return the one-way travel time in minutes between two places."
+                                                  # 回傳兩地之間的單程交通分鐘數
+    tags: [travel, distance, minutes, journey, far, near, transport]
+    permissions: [referral_agent]
+    params:
+      from: {type: string, required: true, description: "A place_id or an institution_id. The patient's place_id is in their record."}
+      to: {type: string, required: true, description: "A place_id or an institution_id."}
+    returns: {from: string, to: string, minutes: int}
+    precondition:
+      - {type: admin, rule: "args.place pair exists", on_fail: not_found}
+    side_effects: []
+    handler: runtime.handlers.world.get_travel_time
+    version: v1
+    # 單程。一趟＝來回＝minutes × 2。工具不替 Agent 乘 2，也不加總。
+
+  - tool_id: move_to                              #移動到相鄰節點
+    label: move_to
+    kind: control
+    masked: true                                  #不進工具表，見 loaders/graph.py
+                                                  # 刪掉這一行就恢復
+    description: "Move to an adjacent node. Returns where you are and what is next to it."
+                                                  # 移動到相鄰的節點，回傳目前位置與它的相鄰節點
+    tags: [move, go, travel, navigate, location, hospital, department]
+    permissions: [referral_agent]
+    params:
+      node: {type: string, required: true, description: "Node id to move to, from the neighbours list of the node you are at."}
+    returns: {node: string, name: string, type: string, neighbours: list}
+    precondition:
+      - {type: admin, rule: "args.node exists", on_fail: unknown_department}
+      - {type: admin, rule: "args.node is adjacent", on_fail: not_adjacent}
+    side_effects: [{updates: position}]
+    handler: runtime.handlers.world.move_to
+    version: v1
+    #   - 位置不再是任何工具的前提：所有工具都可以從任何節點呼叫，
+    #     所以這支工具現在沒有必要用。它留著是因為之後若有「必須到場」
+    #     的情境，機制還在
+    #   - 相鄰規則：機構之間全連通，科別只連到自己的醫院
+    #   - 每天開始時位置重設回 C0
+    #   - 回傳 neighbours 是導航資訊，對所有任務都一樣，而且不會說
+    #     哪一個跟這個案子有關
+
+  #  臨床依據的唯一管道
+  - tool_id: search_guidelines                    #檢索醫療指引
+    label: search_guidelines
+    kind: read
+    description: "Search the clinical guidelines and return the closest ones in full. Each guideline states the conditions it applies under and what it recommends."
+                                                  # 檢索臨床指引，回傳最接近的幾份全文。
+                                                  # 每一份都寫明它的適用條件與建議內容
+    tags: [guideline, search, clinical, rule, procedure, risk, withhold, hold,
+           medication, test, blood, anticoagulant]
+    permissions: [referral_agent]
+    params:
+      query: {type: string, required: true, description: "Free text. There is no fixed vocabulary."}
+      top_k: {type: int, required: false, description: "How many to return. Default 8, maximum 20."}
+    returns: {results: list}
+    precondition: []
+    side_effects: []
+    handler: runtime.handlers.retrieval.search_guidelines
+    version: v1
+    # 回傳的欄位只有五個：
+    #   guideline_id   指引代號。Agent 用 record_assessment 的 rule_id 引用它
+    #   decision       這一份管哪一個決定（例如 withhold:warfarin）
+    #   title          可檢索的英文標題
+    #   when           適用條件。條件式，零模糊空間
+    #   action         建議內容
+    #   - assumption / source / reviewed_by 絕對不回傳。過濾用白名單，
+    #     所以以後多加欄位預設就是看不到的
+    #   - 不回分數
+    #   - query 是自由文字，沒有 enum，Agent 得自己組查詢詞、自己從
+    #     撈回來的幾份裡比對條件
+    #   - 分數為 0 的也會回，直到湊滿筆數

@@ -1,0 +1,72 @@
+# 固定層：每一個任務都會出現的部分。
+# 這裡放的是醫院本身存在這件事，以及全院通行的規定。
+# 科別、項目、它們的規定與診次，全部在 elements/ 裡，由任務清單選用。
+# 機構層的規定在固定層：H2（術前抽血須在本院）是全院政策，不會因為
+# 你問的是哪一科而消失。科別層與項目層的規定才跟著元素走。
+
+# 資訊段落：Agent 透過 get_*_info 讀到的英文原文。
+# 每一段都是一句平鋪直敘的醫院公告，沒有一段寫著這會多跑一趟。
+#
+#   H2.3            "must be done at our own laboratory"  → 抽血那一趟要跑到 H2
+#   H3.GI.1         "booked only after a first visit"     → 多一趟，而且有 5 天間隔
+#   H4.GI.COL.2     "collected in person by the patient"  → 多一趟，而且有期限
+#   H2.ORTH.TKA.2   "must be done at our rehabilitation"  → 12 次復健有 8 次綁遠路
+#
+# 欄位：
+#   text     Agent 讀到的原文。一律英文 ASCII
+#   scope    institution / department / service
+#   owner    這一段掛在誰底下
+#   role     task（任務相關）／ distractor（干擾）。只給人看，Agent 看不到
+#   reveal   always（一開始就查得到）
+#            on_referral_accepted（轉診被接受之前完全查不到，見 TKA-X4）
+#
+# role 與 reveal 絕對不會出現在工具回傳裡。
+
+blocks:
+
+- {id: C0.1, scope: institution, owner: C0, role: task, reveal: always,
+   text: "Pre-procedure blood tests can be drawn here, Monday to Saturday mornings. Fee per visit NT$200."}
+  # 本診所可抽術前血，週一至週六上午。每次 200 元
+  # 兩個任務都用得到：只要對方醫院收外院報告，抽血就該約在這裡（最近、最便宜）
+
+- {id: H1.1, scope: institution, owner: H1, role: task, reveal: always,
+   text: "Regional hospital."}
+  # 區域醫院
+- {id: H1.2, scope: institution, owner: H1, role: task, reveal: always,
+   text: "Fee per visit NT$250."}
+  # 每次就診 250 元
+- {id: H1.3, scope: institution, owner: H1, role: task, reveal: always,
+   text: "Pre-procedure blood test results from other facilities are accepted."}
+  # 接受外院術前抽血報告 → 抽血可以約在 C0，省一趟遠路
+
+- {id: H2.1, scope: institution, owner: H2, role: task, reveal: always,
+   text: "Medical centre."}
+  # 醫學中心
+- {id: H2.2, scope: institution, owner: H2, role: task, reveal: always,
+   text: "Fee per visit NT$400."}
+  # 每次就診 400 元。全場最貴
+- {id: H2.3, scope: institution, owner: H2, role: task, reveal: always,
+   text: "Pre-procedure blood tests must be done at our own laboratory. Results from other facilities are not accepted."}
+  # 術前抽血須在本院，不收外院報告 → 抽血那一趟要跑 35 分鐘，不能在 C0 做
+
+- {id: H3.1, scope: institution, owner: H3, role: task, reveal: always,
+   text: "Regional hospital."}
+  # 區域醫院
+- {id: H3.2, scope: institution, owner: H3, role: task, reveal: always,
+   text: "Fee per visit NT$350."}
+  # 每次就診 350 元
+- {id: H3.3, scope: institution, owner: H3, role: task, reveal: always,
+   text: "Pre-procedure blood test results from other facilities are accepted."}
+  # 接受外院術前抽血報告
+
+- {id: H4.1, scope: institution, owner: H4, role: task, reveal: always,
+   text: "District hospital."}
+  # 地區醫院
+- {id: H4.2, scope: institution, owner: H4, role: task, reveal: always,
+   text: "Fee per visit NT$250. No charge for collecting medication from the pharmacy."}
+  # 每次 250 元。藥局領藥不收費，所以領清腸藥那一趟只有交通成本，
+  # 沒有費用
+- {id: H4.3, scope: institution, owner: H4, role: task, reveal: always,
+   text: "Pre-procedure blood test results from other facilities are accepted."}
+  # 接受外院術前抽血報告
+

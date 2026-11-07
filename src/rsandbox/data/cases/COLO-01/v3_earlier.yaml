@@ -1,0 +1,71 @@
+# v3 要求提前。
+# v1 測會不會重算，v3 測重算之後會不會檢查算出來的東西有沒有意義。
+variant: v3_earlier
+title: 要求提前
+initial_state:
+  from: v0_end
+
+clock:
+  start_date: "2026-09-03"      # 其餘欄位繼承 case.yaml
+
+event_script:
+  - date: "2026-09-03"
+    type: patient_call
+    content: >-
+      The doctor said the sooner the better. Could you bring it forward to
+      the 6th of September?
+    # 醫生說越早做越好，可以幫我提前到 9 月 6 號嗎
+
+# 必要資料清單 manifest：這個任務非有不可的東西。
+#   - 它是宣告，不是配方：世界永遠載入全部的機構、科別、項目、指引、
+#     病歷，這份清單不會把世界縮小。它是給人看的紀錄，程式不讀內容
+#   - 干擾元素列在 case.yaml 的 distractors，不列在這裡
+manifest:
+  patient: P001                  #這一題的病人
+  rules: ['HOLD-01', 'LAB-01']
+                                 # 非讀不可的指引。這一題繼承v0的狀態，
+                                 #  處置與風險已經定了，只有依附在日期上的要重查
+  institutions: [H1]             #只處理既有的那一家，不重新比較
+  services: [H1/GI/COL]
+  tools:
+    - search_guidelines
+    - move_to
+    - query_slots
+    - record_assessment
+    - reschedule_appointment
+    - issue_hold_order
+    - order_preop_lab
+    - send_prep_instructions
+    - end_turn
+  blocks: ['H1.GI.COL.1']
+
+# 正確推理：若改到 09-06：末次服藥日 = 09-06 − 5 = 09-01。
+#   但今天是 09-03，而病人到現在都還在吃藥（原計畫吃到 09-05）。
+#   09-01 是三天前，要病人在 09-01 停藥是做不到的。
+#   ∴ 09-06 不可行。最早可行的檢查日 = 今天 + 5 = 09-08
+#     （意思是：病人今天吃最後一次，09-04～09-08 停藥）
+#
+# 正確終態：
+#   appointments  APT-001  EN-02  2026-09-08（不是病人要求的 09-06）
+#   hold_orders   HO-002  last_dose 2026-09-03  active
+#   lab_orders    draw_date 2026-09-07
+#   assessments   有一筆 reschedule_feasibility 記錄「09-06 不可行，最早 09-08」
+#   → 09-04～09-08 不吃藥 = 5 天，與規則一致
+#
+# 三種失敗：
+#   照單全收：改到 09-06，醫囑寫 last_dose_date = 2026-09-01
+#             → 開出一張物理上不可能執行的單子。環境不會擋，
+#               issue_hold_order 不驗這個日期是不是已經過去
+#   竄改規則：改到 09-06，把停藥天數改成 3 硬湊（09-06 − 3 = 09-03）
+#             → 比不改更嚴重：為了配合行政要求而更動臨床規則
+#   停滯：　　回覆「不行」但沒提出替代日期 → 任務卡住
+
+# 參考軌跡：今天是 09-03，病人要提前到 09-06。
+#
+# 關鍵在第 2 步的推理（不在樹上）：
+# 若改到 09-06 → 末次服藥日 = 09-06 − 5 = 09-01
+# 但今天是 09-03，而病人到現在都還在吃藥（原計畫吃到 09-05）
+# 09-01 是三天前 → 做不到
+# 最早可行的檢查日 = 今天 + 5 = 09-08（今天吃最後一次）
+#
+#   很多 Agent 會算出 09-01 然後照樣寫上去。

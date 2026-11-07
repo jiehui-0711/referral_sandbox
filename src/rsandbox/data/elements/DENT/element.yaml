@@ -1,0 +1,69 @@
+# 元素 DENT：牙科
+# 一個元素 = 一個臨床能力包，跨醫院。它宣告自己需要哪些科別與項目，
+# 以及那些科別／項目的規定與診次。
+#   - 科別可以被多個元素宣告（骨科同時被人工膝關節與骨折用到），
+#     載入器會合併，屬性不一致才報錯
+#   - 任務清單用 elements 選它當必要元素，用 distractors 選它當干擾
+#     元素。內容完全一樣，干擾不另外撰寫
+element_id: DENT
+title: 牙科
+
+#  這個元素需要的科別與項目
+departments:
+  # 掛在 H3
+  - dept_id: H3_DENT
+    dept: DENT
+    name: Dentistry                      #牙科
+    status: published
+    block_ids: [H3.DENT.1]
+    services:
+      - {code: CHECK, name: Dental check-up,               slot_type: clinic}
+        # 牙科只有 H3 和 H4 有。TKA-X1／X4 要重做牙科檢查時的兩個選項之一
+        # （H3 50 分 vs H4 8 分 → 正確答案是 H4）
+
+  # 掛在 H4
+  - dept_id: H4_DENT
+    dept: DENT
+    name: Dentistry                      #牙科
+    status: published
+    block_ids: [H4.DENT.1]
+    services:
+      - {code: CHECK, name: Dental check-up,               slot_type: clinic}
+        # 平日上午都有，而且當天給書面報告。TKA-X1／X4 的正確答案
+
+#  科別層與項目層的資訊段落
+blocks:
+
+- {id: H3.DENT.1, scope: department, owner: H3/DENT, role: task, reveal: always,
+   text: "Dental clinic, Tuesday and Thursday mornings. Check-ups and treatment."}
+- {id: H4.DENT.1, scope: department, owner: H4/DENT, role: task, reveal: always,
+   text: "Dental check-ups, Monday to Friday mornings. A written report is given on the same day."}
+  # 平日都有，當天給報告 → TKA-X1／X4 重做牙科時的正確答案（8 分 vs H3 的 50 分）
+
+#  診次規則
+slot_rules:
+
+#  牙科：TKA-X1／X4 用
+
+- rule_id: R-H3-DENT-CHECK
+  institution_id: H3
+  dept: DENT
+  service: CHECK
+  weekdays: [Tue, Thu]
+  period: AM
+  capacity: 8
+  date_from: "2026-09-01"
+  date_to: "2027-02-28"
+
+- rule_id: R-H4-DENT-CHECK
+  institution_id: H4
+  dept: DENT
+  service: CHECK
+  weekdays: [Mon, Tue, Wed, Thu, Fri]
+  period: AM
+  capacity: 8
+  date_from: "2026-09-01"
+  date_to: "2027-02-28"
+  # 8 分鐘，平日都有，當天給報告 → 兩個牙科選項裡的正確答案
+
+

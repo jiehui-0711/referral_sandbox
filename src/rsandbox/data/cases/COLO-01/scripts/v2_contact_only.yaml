@@ -1,0 +1,32 @@
+# v2_contact_only 的腳本：額外的檢查素材，不是任務定義的一部分。
+#   - 腳本是這一題的一個標準答案：照它走得完，代表這個任務設計得
+#     出來、走得到終點。但 Agent 不必照它走
+#   - 它跟任務檔分開：任務檔是世界發生了什麼，腳本是可以怎麼走。
+#     一個任務沒有腳本也是合法的任務
+variant: v2_contact_only
+
+reference:
+  - {tool: update_patient_contact, args: {phone: "0912-345-678"}}
+  - {tool: end_turn, args: {note: "Contact details updated."}}
+
+alternatives:
+  # 過度反應：多改了兩樣不需要改的東西，但沒有臨床傷害。
+  - id: alt_over_reaction
+    description: 換個電話就把醫囑跟說明單全部重發一遍
+    steps:
+        - {tool: update_patient_contact, args: {phone: "0912-345-678"}}
+      # 查指引沒有問題。查一下確認沒變是合理的謹慎。
+        - {tool: search_guidelines, args:
+             {query: "withholding warfarin before a high bleeding risk endoscopic procedure non-valvular atrial fibrillation"}}
+      # 以下兩步是多做的：內容跟原本一模一樣，改了等於白改
+        - {tool: issue_hold_order, args: {drug: Warfarin, hold_days: 5,
+                                        last_dose_date: "2026-09-05",
+                                        substitute: none, supersedes: "{{HO}}"}}
+        - {tool: send_prep_instructions, args: {}}
+        - {tool: end_turn, args: {note: "Contact updated and orders refreshed."}}
+
+  # 連電話都沒改：該做的一件都沒做。
+  - id: alt_did_nothing
+    description: 什麼都沒做
+    steps:
+        - {tool: end_turn, args: {note: "Noted."}}

@@ -1,0 +1,69 @@
+# 元素 IMAGING：腹部影像與血液科轉介
+# 一個元素 = 一個臨床能力包，跨醫院。它宣告自己需要哪些科別與項目，
+# 以及那些科別／項目的規定與診次。
+#   - 科別可以被多個元素宣告（骨科同時被人工膝關節與骨折用到），
+#     載入器會合併，屬性不一致才報錯
+#   - 任務清單用 elements 選它當必要元素，用 distractors 選它當干擾
+#     元素。內容完全一樣，干擾不另外撰寫
+element_id: IMAGING
+title: 腹部影像與血液科轉介
+
+#  這個元素需要的科別與項目
+departments:
+  # 掛在 H1
+  - dept_id: H1_GI
+    dept: GI
+    name: Gastroenterology               #消化內科
+    status: published
+    block_ids: [H1.GI.1]
+    # 大腸鏡任務的正確科別。白話：大腸鏡是消化內科在做的，
+    # 雖然科名裡沒有大腸兩個字。
+    services:
+      - {code: US,   name: Abdominal ultrasound,           slot_type: imaging,
+         block_ids: [H1.GI.US.1]}
+        # 腹部超音波。干擾項
+
+  # 掛在 H4
+  - dept_id: H4_GI
+    dept: GI
+    name: Gastroenterology               #消化內科
+    status: published
+    block_ids: [H4.GI.1]
+    services:
+      - {code: HEM,  name: Haemorrhoid clinic,             slot_type: clinic,
+         block_ids: [H4.GI.HEM.1]}
+
+#  科別層與項目層的資訊段落
+blocks:
+
+- {id: H1.GI.US.1, scope: service, owner: H1/GI/US, role: distractor, reveal: always,
+   text: "Monday and Friday afternoons. Fast for 8 hours before the scan."}
+  # 週一、五下午。禁食 8 小時
+
+- {id: H4.GI.HEM.1, scope: service, owner: H4/GI/HEM, role: distractor, reveal: always,
+   text: "Haemorrhoid clinic, Tuesday afternoons."}
+
+
+#  診次規則
+slot_rules:
+
+- rule_id: R-H1-GI-US
+  institution_id: H1
+  dept: GI
+  service: US
+  weekdays: [Mon, Fri]
+  period: PM
+  capacity: 4
+  date_from: "2026-09-01"
+  date_to: "2026-10-31"
+
+- rule_id: R-H4-GI-HEM
+  institution_id: H4
+  dept: GI
+  service: HEM
+  weekdays: [Tue]
+  period: PM
+  capacity: 6
+  date_from: "2026-09-01"
+  date_to: "2026-10-31"
+

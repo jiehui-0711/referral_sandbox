@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+runs/
+.conda-env/
+agent_visible.json
+.DS_Store
+qwen_trace_analysis.html
+實驗紀錄.md
+checks/design/

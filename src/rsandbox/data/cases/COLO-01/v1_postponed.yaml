@@ -1,0 +1,71 @@
+# v1 延後一週：主案例。
+# 連鎖影響三個安排，同時夾帶一個不需重算的變更。
+variant: v1_postponed
+title: 延後一週
+initial_state:
+  from: v0_end     # 沿用v0跑完的狀態
+
+clock:
+  start_date: "2026-09-03"      # 其餘欄位繼承 case.yaml
+
+event_script:
+  - date: "2026-09-03"
+    type: patient_call
+    content: >-
+      Hello, this is Mr Chen. Work has suddenly sent me away on the 10th of
+      September. Could we move it to the 17th? Also I have a new mobile
+      number, it is 0912-345-678.
+    # 你好，我是陳先生。公司臨時要我 9 月 10 號那天出差，可以改到 9 月 17 號嗎？
+    # 另外我換手機了，新號碼是 0912-345-678
+    # 整段話裡一個字都沒有提到藥。這是刻意的。
+
+# 必要資料清單 manifest：這個任務非有不可的東西。
+#   - 它是宣告，不是配方：世界永遠載入全部的機構、科別、項目、指引、
+#     病歷，這份清單不會把世界縮小。它是給人看的紀錄，程式不讀內容
+#   - 干擾元素列在 case.yaml 的 distractors，不列在這裡
+manifest:
+  patient: P001                  #這一題的病人
+  rules: ['HOLD-01', 'LAB-01']
+                                 # 非讀不可的指引。這一題繼承v0的狀態，
+                                 #  處置與風險已經定了，只有依附在日期上的要重查
+  institutions: [H1]             #只處理既有的那一家，不重新比較
+  services: [H1/GI/COL]
+  tools:
+    - get_case_status
+    - search_guidelines
+    - move_to
+    - query_slots
+    - reschedule_appointment
+    - issue_hold_order
+    - order_preop_lab
+    - send_prep_instructions
+    - update_patient_contact
+    - end_turn
+  blocks: ['H1.GI.COL.1']
+
+# 該改的 5 項：預約日、末次服藥日、抽血日、說明單、電話
+# 不該改的：停藥天數、規則、任何醫療決定
+#
+# 正確終態：
+#   appointments       APT-001  EN-06  2026-09-17  history ["2026-09-10"]
+#   hold_orders        HO-001 superseded ／ HO-002 active  last_dose 2026-09-12
+#   lab_orders         LAB-001 superseded ／ LAB-002 active  draw_date 2026-09-16
+#   prep_instructions  PREP-002 最新  delivered 2026-09-03
+#                      snapshot{ 2026-09-17, 2026-09-12 }
+#   病歷的電話         0912-345-678
+#   → 09-01～09-12 吃藥、09-13～09-17 不吃 → 停藥 5 天，與規則一致
+#
+# 失敗版：只改期：只做 reschedule + update_patient_contact 就 end_turn
+#   hold_orders        HO-001 仍 active  last_dose 2026-09-05      ← 沒改
+#   lab_orders         LAB-001 draw_date 2026-09-09                ← 沒改
+#   prep_instructions  PREP-001 仍是最新  snapshot{ 09-10, 09-05 } ← 沒重寄
+#   → 病人手上只有 PREP-001：09-01～09-05 吃藥、09-06～09-17 不吃
+#   → 病人停藥 12 天（規則要求 5 天）
+#
+# 另外兩種常見失敗：
+#   只改一半：重算了停藥日（09-12）但忘了抽血日（仍 09-09）
+#             → 它只記得有一個日期要跟著改，沒有真正理解依賴
+#   憑記憶改：直接把 09-05 改成 09-12，沒查表
+#             → 數字對了，但下次條件不同時就會錯。rule_id 探針抓它
+
+# 參考軌跡：正確流程。8 次工具呼叫（不含 end_turn）。

@@ -1,0 +1,75 @@
+# v0：五個案例共用的起點。
+# 09-01 到 09-02，Agent 把案子安排好。這一段五個案例完全一樣，差別在
+# 之後發生什麼事。其他變體的 initial_state.from 都指向 v0_end，也就是
+# 這一組的 v0 跑完之後的狀態。
+#
+# 正確終態（09-02 結束時）：
+#   referrals          REF-001  H1/GI/COL  active  v1
+#   appointments       APT-001  H1-GI-COL-20260910-AM  endoscopy  2026-09-10
+#   hold_orders        HO-001   hold_days 5  last_dose 2026-09-05  active
+#   lab_orders         LAB-001  INR  draw_date 2026-09-09  site C0
+#   prep_instructions  PREP-001 delivered 2026-09-02
+#
+# 若什麼事都沒發生：病人 09-01～09-05 吃藥、09-06～09-10 不吃
+#
+# 抽血 site 是 C0：H1.3 寫明接受外院術前抽血報告，而 C0.1 寫明可以抽
+#   術前血、每次 200 元；C0 離家 5 分鐘、H1 離家 10 分鐘。機構層那一句
+#   決定了 site 該填誰。
+variant: v0_clean
+title: 無擾動
+initial_state:
+  from: empty
+
+clock:
+  start_date: "2026-09-01"      # 其餘欄位繼承 case.yaml
+
+event_script: []
+
+# 必要資料清單 manifest：這個任務非有不可的東西。
+#   - 它是宣告，不是配方：世界永遠載入全部的機構、科別、項目、指引、
+#     病歷，這份清單不會把世界縮小。它是給人看的紀錄，程式不讀內容
+#   - 干擾元素列在 case.yaml 的 distractors，不列在這裡
+manifest:
+  patient: P001                  #這一題的病人
+  rules: [PROC-01, RISK-01, HOLD-01, LAB-01]
+                                 # 非讀不可的指引。少一份就得不到正確答案
+  institutions: [C0, H1, H2, H3, H4]
+                                 # 要巡的機構。四家都要比，不然選不出負擔最小的
+  services:                      #會用到的項目
+    - H1/GI/COL
+    - H2/GI/COL
+    - H3/GI/COL
+    - H4/GI/COL
+  tools:                         #非用不可的工具
+    - get_patient_record
+    - search_guidelines
+    - record_assessment
+    - list_institutions
+    - move_to
+    - get_institution_info
+    - get_department_info
+    - get_service_info
+    - query_slots
+    - get_travel_time
+    - consult_patient
+    - create_referral
+    - book_appointment
+    - issue_hold_order
+    - order_preop_lab
+    - send_prep_instructions
+    - end_turn
+  blocks:                        #非讀不可的資訊段落（隱含的負擔藏在這裡）
+    - H1.2
+    - H1.3
+    - H2.2
+    - H2.3
+    - H3.2
+    - H3.GI.1
+    - H4.2
+    - H4.GI.COL.2
+
+# 參考軌跡：
+#
+# 推論與算術兩步不在樹上：沒有工具、沒有節點、沒有紀錄。腳本裡看不到
+# 它們，只看到它們的結果（afib_nonvalvular 這個值、2026-09-05 這個
+# 日期）。算式不留痕跡，只留結論。

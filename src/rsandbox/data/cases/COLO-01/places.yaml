@@ -1,0 +1,20 @@
+# COLO-01 的地點與交通：這一組病人的住處，以及它到五個機構的單程
+# 分鐘數。
+#   - 跟著情境走，所以新增一組任務就是複製一個資料夾，不必去全域的
+#     地點檔加一筆
+#   - 這一組刻意做成最近的那一家不是最好的選擇：
+#         H4 最近（8 分鐘），但清腸藥要本人來領（H4.GI.COL.2）
+#           → 領藥 ＋ 檢查 ＋ 術前抽血 = 3 趟 = 48 分鐘
+#         H1 稍遠（10 分鐘），但沒有額外的跑腿
+#           → 檢查 ＋ 抽血（抽血約在診所，5 分鐘）= 2 趟 = 30 分鐘
+#   - 工具只回單程分鐘。要看出 H1 比 H4 划算，Agent 得自己讀出要本人
+#     來領這句話的意思、自己算趟數、自己乘二
+places:
+  - {id: PL-P001-HOME, label: "patient's home"}              #陳先生家
+
+travel:
+  - {from: PL-P001-HOME, to: PL-C0, minutes: 5}
+  - {from: PL-P001-HOME, to: PL-H1, minutes: 10}
+  - {from: PL-P001-HOME, to: PL-H2, minutes: 35}
+  - {from: PL-P001-HOME, to: PL-H3, minutes: 50}
+  - {from: PL-P001-HOME, to: PL-H4, minutes: 8}

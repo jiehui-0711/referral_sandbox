@@ -1,0 +1,169 @@
+# 元素 TKA：人工膝關節置換
+# 一個元素 = 一個臨床能力包，跨醫院。它宣告自己需要哪些科別與項目，
+# 以及那些科別／項目的規定與診次。
+#   - 科別可以被多個元素宣告（骨科同時被人工膝關節與骨折用到），
+#     載入器會合併，屬性不一致才報錯
+#   - 任務清單用 elements 選它當必要元素，用 distractors 選它當干擾
+#     元素。內容完全一樣，干擾不另外撰寫
+element_id: TKA
+title: 人工膝關節置換
+
+#  這個元素需要的科別與項目
+departments:
+  # 掛在 H1
+  - dept_id: H1_ORTH
+    dept: ORTH
+    name: Orthopaedics                   #骨科
+    status: published
+    block_ids: [H1.ORTH.1]
+    services:
+      - {code: TKA,  name: Total knee replacement,         slot_type: surgery,
+         block_ids: [H1.ORTH.TKA.1, H1.ORTH.TKA.2, H1.ORTH.TKA.3],
+         prep_block_ids: [H1.ORTH.TKA.1], stay_nights: 3}
+  # 人工膝關節置換。換膝蓋任務的正確答案。住 3 晚
+  # 掛在 H2
+  - dept_id: H2_ORTH
+    dept: ORTH
+    name: Orthopaedics                   #骨科
+    status: published
+    block_ids: [H2.ORTH.1]
+    services:
+      - {code: TKA,  name: Total knee replacement,         slot_type: surgery,
+         block_ids: [H2.ORTH.TKA.1, H2.ORTH.TKA.2],
+         prep_block_ids: [H2.ORTH.TKA.1], stay_nights: 3}
+        # 週四開刀。抽血與麻醉評估在一站式術前門診一起做（省一趟），
+        # 但出院後前 4 週復健綁本院（多 8 趟遠路）
+      - {code: PREOP, name: One-stop pre-operative clinic, slot_type: clinic,
+         block_ids: [H2.ORTH.TKA.1]}
+  # 一站式術前門診。抽血＋麻醉評估一次做完，最晚手術前 7 天
+  # 掛在 H3
+  - dept_id: H3_ORTH
+    dept: ORTH
+    name: Orthopaedics                   #骨科
+    status: published
+    block_ids: [H3.ORTH.1]
+    services:
+      - {code: FIRST, name: Orthopaedic first visit,       slot_type: clinic,
+         block_ids: [H3.ORTH.1]}
+        # 初診。麻醉評估順便在這一趟做掉，所以省了一趟又多了一趟
+      - {code: CLASS, name: Pre-operative education class, slot_type: clinic,
+         block_ids: [H3.ORTH.TKA.2]}
+        # 術前衛教課。週六上午，免費，但還是要跑一趟 50 分鐘
+      - {code: TKA,  name: Total knee replacement,         slot_type: surgery,
+         block_ids: [H3.ORTH.TKA.1], prep_block_ids: [H3.ORTH.TKA.1],
+         stay_nights: 3}
+
+#  科別層與項目層的資訊段落
+blocks:
+
+#  骨科 ORTH
+- {id: H1.ORTH.1, scope: department, owner: H1/ORTH, role: task, reveal: always,
+   text: "Referrals are accepted electronically. Surgery can be booked once the referral has been accepted."}
+- {id: H1.ORTH.TKA.1, scope: service, owner: H1/ORTH/TKA, role: task, reveal: always,
+   text: "Total knee replacement on Tuesdays. Admission on the morning of surgery; the usual stay is 3 nights."}
+  # 週二開刀。手術當天早上入院，一般住 3 晚 → 出院日 = 手術日 + 3
+- {id: H1.ORTH.TKA.2, scope: service, owner: H1/ORTH/TKA, role: task, reveal: always,
+   text: "The pre-anaesthesia assessment is done on the morning of admission."}
+  # 麻醉評估在入院當天早上 → 不用多跑一趟
+- {id: H1.ORTH.TKA.3, scope: service, owner: H1/ORTH/TKA, role: task, reveal: always,
+   text: "Physiotherapy after discharge may be arranged at any facility."}
+  # 出院後的復健可以在任何機構 → 所以可以選離家最近的 H4
+- {id: H1.ORTH.TKA.4, scope: service, owner: H1/ORTH/TKA, role: task,
+   reveal: on_referral_accepted, variant_only: TKA-X4,
+   text: "A dental check-up within 3 months before surgery is required."}
+  # TKA-X4 專用。送出轉診才看得到。
+  # 指引（DENT-01）說 6 個月內，醫院說 3 個月內 → 醫院的比較嚴
+- {id: H2.ORTH.1, scope: department, owner: H2/ORTH, role: task, reveal: always,
+   text: "Referrals are accepted electronically. Surgery can be booked once the referral has been accepted."}
+- {id: H2.ORTH.TKA.1, scope: service, owner: H2/ORTH/TKA, role: task, reveal: always,
+   text: "Total knee replacement on Thursdays. Blood tests and the pre-anaesthesia assessment are done together at our one-stop pre-operative clinic, at least 7 days before surgery. Usual stay 3 nights."}
+  # 一站式術前門診：抽血＋麻醉評估一起做（省一趟），但最晚手術前 7 天
+- {id: H2.ORTH.TKA.2, scope: service, owner: H2/ORTH/TKA, role: task, reveal: always,
+   text: "For the first 4 weeks after discharge, physiotherapy must be done at our rehabilitation department."}
+  # 出院後前 4 週復健綁本院 → 12 次裡有 8 次要跑 35 分鐘。這一條最貴
+- {id: H3.ORTH.1, scope: department, owner: H3/ORTH, role: task, reveal: always,
+   text: "Joint replacement surgery is booked only after a first visit to our orthopaedic clinic (Monday and Wednesday mornings). The pre-anaesthesia assessment is done at that visit."}
+  # 要先初診（多一趟），但麻醉評估順便做掉（省一趟）
+- {id: H3.ORTH.TKA.1, scope: service, owner: H3/ORTH/TKA, role: task, reveal: always,
+   text: "Total knee replacement on Wednesdays. Usual stay 3 nights."}
+- {id: H3.ORTH.TKA.2, scope: service, owner: H3/ORTH/TKA, role: task, reveal: always,
+   text: "Patients must attend a pre-operative education class (Saturday mornings) before surgery. No fee for the class."}
+  # 術前衛教課。免費，但還是要跑一趟 50 分鐘，費用是 0、負擔不是 0
+- {id: H4.ORTH.1, scope: department, owner: H4/ORTH, role: task, reveal: always,
+   text: "Fracture and sports injury clinics only. Joint replacement surgery is not performed at this hospital."}
+  # 本院不做關節置換。Agent 要讀出來，而不是查到空清單才發現
+
+#  診次規則
+slot_rules:
+
+#  換膝蓋任務 TKA（2026 年 10-12 月）
+
+- rule_id: R-H1-ORTH-TKA
+  institution_id: H1
+  dept: ORTH
+  service: TKA
+  weekdays: [Tue]
+  period: AM
+  capacity: 1
+  date_from: "2026-10-26"
+  date_to: "2027-01-31"
+  prebooked:
+    - {date: "2026-11-03", count: 1}
+    - {date: "2026-11-10", count: 1}
+    - {date: "2026-12-01", count: 1}
+    - {date: "2026-12-08", count: 1}
+  # v0 約 11/17。TKA-X1 的擾動把 12/15 之前全部取消 → 改到 12/15
+
+- rule_id: R-H2-ORTH-PREOP
+  institution_id: H2
+  dept: ORTH
+  service: PREOP
+  weekdays: [Mon, Tue, Wed, Thu, Fri]
+  period: AM
+  capacity: 6
+  date_from: "2026-10-27"
+  date_to: "2027-01-31"
+  # 一站式術前門診：抽血＋麻醉評估一次做完，最晚手術前 7 天
+
+- rule_id: R-H2-ORTH-TKA
+  institution_id: H2
+  dept: ORTH
+  service: TKA
+  weekdays: [Thu]
+  period: AM
+  capacity: 1
+  date_from: "2026-10-26"
+  date_to: "2027-01-31"
+  # 11/5 有名額，但術前抽血窗口已過 → 不可行；最早可行 11/12
+
+- rule_id: R-H3-ORTH-FIRST
+  institution_id: H3
+  dept: ORTH
+  service: FIRST
+  weekdays: [Mon, Wed]
+  period: AM
+  capacity: 6
+  date_from: "2026-10-28"
+  date_to: "2027-01-31"
+
+- rule_id: R-H3-ORTH-CLASS
+  institution_id: H3
+  dept: ORTH
+  service: CLASS
+  weekdays: [Sat]
+  period: AM
+  capacity: 10
+  date_from: "2026-10-31"
+  date_to: "2027-01-31"
+  # 術前衛教課。免費，但還是要跑一趟 50 分鐘，費用是 0、負擔不是 0
+
+- rule_id: R-H3-ORTH-TKA
+  institution_id: H3
+  dept: ORTH
+  service: TKA
+  weekdays: [Wed]
+  period: AM
+  capacity: 1
+  date_from: "2026-11-11"
+  date_to: "2027-01-31"
+
